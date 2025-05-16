@@ -5,6 +5,7 @@ pub enum DebuggerError {
     IoError(std::io::Error),
     AddrParseError(std::net::AddrParseError),
     ConnectionError(String),
+    SerializationError(String),
 }
 
 impl std::fmt::Display for DebuggerError {
@@ -13,6 +14,7 @@ impl std::fmt::Display for DebuggerError {
             DebuggerError::IoError(err) => write!(f, "IO Error: {}", err),
             DebuggerError::AddrParseError(err) => write!(f, "Parse Error: {}", err),
             DebuggerError::ConnectionError(msg) => write!(f, "Connection Error: {}", msg),
+            DebuggerError::SerializationError(msg) => write!(f, "Serialization Error: {}", msg),
         }
     }
 }

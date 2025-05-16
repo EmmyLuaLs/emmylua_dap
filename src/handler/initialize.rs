@@ -1,22 +1,26 @@
-use dap::{requests::{InitializeArguments, Request}, responses::ResponseBody, types::Capabilities};
+use dap::{
+    requests::InitializeArguments,
+    responses::ResponseBody,
+    types::Capabilities,
+};
+use tokio_util::sync::CancellationToken;
 
-use crate::context::EmmyLuaDebugContext;
+use crate::context::DapSnapShot;
+
+use super::RequestResult;
 
 pub async fn on_initialize_request(
-    _: &EmmyLuaDebugContext,
+    _: DapSnapShot,
     initialize_arguments: InitializeArguments,
-    request: Request,
-) -> Result<(), Box<dyn std::error::Error>> {
+    _: CancellationToken,
+) -> RequestResult {
     log::info!("Received Initialize request: {:?}", initialize_arguments);
 
-    let response = ResponseBody::Initialize(Capabilities {
+    Ok(ResponseBody::Initialize(Capabilities {
         supports_evaluate_for_hovers: Some(true),
         support_terminate_debuggee: Some(true),
         supports_log_points: Some(true),
         supports_conditional_breakpoints: Some(true),
         ..Default::default()
-    });
-    request.success(response);
-
-    Ok(())
+    }))
 }

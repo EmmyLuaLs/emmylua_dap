@@ -10,7 +10,7 @@ use dap::{
     requests::{Command, Request},
     server::Server,
 };
-use handler::{on_initialize_request, on_launch_request};
+use handler::{on_initialize_request, on_launch_request, on_request_dispatch};
 use logger::init_stderr_logger;
 
 #[tokio::main]
@@ -25,29 +25,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn main_loop(mut server: Server<Stdin, Stdout>) -> Result<(), Box<dyn std::error::Error>> {
-    let context = EmmyLuaDebugContext::new();
+    let output = server.output.clone();
+    let mut context = EmmyLuaDebugContext::new(output);
     while let Some(request) = server.poll_request()? {
-        match request.command.clone() {
-            Command::Initialize(initialize_argument) => {
-                on_initialize_request(&context, initialize_argument, request).await?;
-            }
-            Command::Launch(launch_argument) => {
-                on_launch_request(&context, launch_argument, request).await?;
-            }
-            // Command::Attach(args) => {
-            //     server.send_response(request, format!("Attach with args: {:?}", args)).await?;
-            // }
-            // Command::Disconnect(_) => {
-            //     server.send_response(request, "Disconnect response").await?;
-            // }
-            // Command::Terminate(_) => {
-            //     server.send_response(request, "Terminate response").await?;
-            // }
-            // _ => {
-            //     server.send_error_response(request, "Unknown command").await?;
-            // }
-            _ => {}
-        };
+        on_request_dispatch(&mut context, request).await?;
     }
 
     Ok(())

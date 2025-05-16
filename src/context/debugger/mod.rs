@@ -9,14 +9,15 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{Mutex, mpsc, oneshot};
+use tokio::sync::{Mutex, mpsc};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 
 type DebuggerResult<T> = Result<T, Box<dyn Error + Send>>;
 
+#[allow(unused)]
 #[derive(Debug)]
 pub struct DebuggerConnection {
     stream: Option<Arc<Mutex<TcpStream>>>,
@@ -24,6 +25,7 @@ pub struct DebuggerConnection {
     response_senders: Arc<Mutex<HashMap<MessageCMD, mpsc::Sender<Message>>>>,
 }
 
+#[allow(unused)]
 impl DebuggerConnection {
     pub fn new() -> Self {
         DebuggerConnection {
@@ -74,6 +76,7 @@ impl DebuggerConnection {
         self.start_reader_task();
         Ok(())
     }
+
     pub fn is_connected(&self) -> bool {
         self.stream.is_some()
     }
@@ -110,22 +113,41 @@ impl DebuggerConnection {
                             break;
                         }
                         Ok(n) => {
-                            pos += n;
-
-                            // 尝试解析缓冲区中的所有消息
-                            // 这里需要根据协议格式修改，假设每条消息以换行符结尾
+                            pos += n; // 解析消息格式：第一行是整数ID，第二行是JSON内容
                             let mut start = 0;
-                            for i in 0..pos {
+                            let mut id_line = None;
+                            let mut i = 0;
+
+                            while i < pos {
+                                // 查找换行符
                                 if buffer[i] == b'\n' {
-                                    if let Ok(msg_str) = std::str::from_utf8(&buffer[start..i]) {
-                                        if let Ok(message) =
-                                            serde_json::from_str::<Message>(msg_str)
-                                        {
-                                            Self::dispatch_message(message, &senders).await;
+                                    if id_line.is_none() {
+                                        // 解析第一行作为消息ID
+                                        if let Ok(id_str) = std::str::from_utf8(&buffer[start..i]) {
+                                            if let Ok(_msg_id) = id_str.parse::<i32>() {
+                                                // 记录ID并继续寻找JSON内容
+                                                id_line = Some(start);
+                                                start = i + 1;
+                                            }
                                         }
+                                    } else {
+                                        // 已有ID，这一行是JSON内容
+                                        if let Ok(msg_str) = std::str::from_utf8(&buffer[start..i])
+                                        {
+                                            if let Ok(message) =
+                                                serde_json::from_str::<Message>(msg_str)
+                                            {
+                                                Self::dispatch_message(message, &senders).await;
+                                            } else {
+                                                log::error!("parse fail: {}", msg_str);
+                                            }
+                                        }
+                                        // 重置解析状态，准备解析下一条消息
+                                        id_line = None;
+                                        start = i + 1;
                                     }
-                                    start = i + 1;
                                 }
+                                i += 1;
                             }
 
                             // 处理完整消息后移动剩余数据到缓冲区开头
@@ -150,30 +172,11 @@ impl DebuggerConnection {
         }
     }
 
-    /// 分发消息到对应的接收器
     async fn dispatch_message(
         message: Message,
         senders: &Arc<Mutex<HashMap<MessageCMD, mpsc::Sender<Message>>>>,
     ) {
-        let cmd = match &message {
-            Message::InitReq(_) => MessageCMD::InitReq,
-            Message::InitRsp(_) => MessageCMD::InitRsp,
-            Message::ReadyReq(_) => MessageCMD::ReadyReq,
-            Message::ReadyRsp(_) => MessageCMD::ReadyRsp,
-            Message::AddBreakPointReq(_) => MessageCMD::AddBreakPointReq,
-            Message::AddBreakPointRsp(_) => MessageCMD::AddBreakPointRsp,
-            Message::RemoveBreakPointReq(_) => MessageCMD::RemoveBreakPointReq,
-            Message::RemoveBreakPointRsp(_) => MessageCMD::RemoveBreakPointRsp,
-            Message::ActionReq(_) => MessageCMD::ActionReq,
-            Message::ActionRsp(_) => MessageCMD::ActionRsp,
-            Message::EvalReq(_) => MessageCMD::EvalReq,
-            Message::EvalRsp(_) => MessageCMD::EvalRsp,
-            Message::BreakNotify(_) => MessageCMD::BreakNotify,
-            Message::AttachedNotify(_) => MessageCMD::AttachedNotify,
-            Message::StartHookReq(_) => MessageCMD::StartHookReq,
-            Message::StartHookRsp(_) => MessageCMD::StartHookRsp,
-            Message::LogNotify(_) => MessageCMD::LogNotify,
-        };
+        let cmd = message.get_cmd();
 
         let senders_guard = senders.lock().await;
         if let Some(sender) = senders_guard.get(&cmd) {
@@ -181,7 +184,6 @@ impl DebuggerConnection {
         }
     }
 
-    /// 注册回调接收特定类型的消息
     pub async fn register_callback(&self, cmd: MessageCMD) -> Option<mpsc::Receiver<Message>> {
         if !self.is_connected() {
             return None;
@@ -195,28 +197,89 @@ impl DebuggerConnection {
         Some(rx)
     }
 
-    /// 发送消息
-    pub async fn send_message(&self, message: &Message) -> DebuggerResult<()> {
+    pub async fn send_notification(&self, message: &Message) -> DebuggerResult<()> {
         if let Some(stream) = &self.stream {
             let mut stream_guard = stream.lock().await;
 
             let json = serde_json::to_string(&message)
-                .map_err(|e| DebuggerError::SerializationError(format!("序列化消息失败: {}", e)))?;
+                .map_err(|e| DebuggerError::SerializationError(format!("serde fail: {}", e)))?;
 
-            // 发送消息，加上换行符作为消息分隔符
-            stream_guard
-                .write_all((json + "\n").as_bytes())
+            let msg_id = message.get_cmd() as i32;
+            let message_text = format!("{}\n{}\n", msg_id, json);
+
+            match stream_guard
+                .write_all(message_text.as_bytes())
                 .await
-                .map_err(|e| DebuggerError::IoError(e).into())?;
+                .map_err(|e| DebuggerError::IoError(e).into())
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("send message fail: {}", e);
+                    return Err(e);
+                }
+            }
 
-            stream_guard
+            match stream_guard
                 .flush()
                 .await
-                .map_err(|e| DebuggerError::IoError(e).into())?;
+                .map_err(|e| DebuggerError::IoError(e).into())
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("flush stream fail: {}", e);
+                    return Err(e);
+                }
+            }
 
             Ok(())
         } else {
-            Err(DebuggerError::ConnectionError("没有建立连接".to_string()).into())
+            Err(DebuggerError::ConnectionError("not connected".to_string()).into())
         }
+    }
+
+    pub async fn send_request(&self, request: &Message) -> DebuggerResult<Message> {
+        if let Some(stream) = &self.stream {
+            let mut stream_guard = stream.lock().await;
+
+            let json = serde_json::to_string(&request)
+                .map_err(|e| DebuggerError::SerializationError(format!("serde fail: {}", e)))?;
+
+            let msg_id = request.get_cmd() as i32;
+            let message_text = format!("{}\n{}\n", msg_id, json);
+
+            match stream_guard
+                .write_all(message_text.as_bytes())
+                .await
+                .map_err(|e| DebuggerError::IoError(e).into())
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("send message fail: {}", e);
+                    return Err(e);
+                }
+            }
+
+            match stream_guard
+                .flush()
+                .await
+                .map_err(|e| DebuggerError::IoError(e).into())
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("flush stream fail: {}", e);
+                    return Err(e);
+                }
+            }
+
+            // 等待响应
+            let receiver = self.register_callback(request.get_cmd()).await;
+            if let Some(mut rx) = receiver {
+                if let Some(response) = rx.recv().await {
+                    return Ok(response);
+                }
+            }
+        }
+
+        Err(DebuggerError::ConnectionError("not connected".to_string()).into())
     }
 }

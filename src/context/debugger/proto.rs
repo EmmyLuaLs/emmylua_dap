@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum MessageCMD {
     Unknown,
@@ -60,6 +60,30 @@ pub enum Message {
     StartHookRsp(StartHookRsp),
 
     LogNotify(LogNotify),
+}
+
+impl Message {
+    pub fn get_cmd(&self) -> MessageCMD {
+        match self {
+            Message::InitReq(_) => MessageCMD::InitReq,
+            Message::InitRsp(_) => MessageCMD::InitRsp,
+            Message::ReadyReq(_) => MessageCMD::ReadyReq,
+            Message::ReadyRsp(_) => MessageCMD::ReadyRsp,
+            Message::AddBreakPointReq(_) => MessageCMD::AddBreakPointReq,
+            Message::AddBreakPointRsp(_) => MessageCMD::AddBreakPointRsp,
+            Message::RemoveBreakPointReq(_) => MessageCMD::RemoveBreakPointReq,
+            Message::RemoveBreakPointRsp(_) => MessageCMD::RemoveBreakPointRsp,
+            Message::ActionReq(_) => MessageCMD::ActionReq,
+            Message::ActionRsp(_) => MessageCMD::ActionRsp,
+            Message::EvalReq(_) => MessageCMD::EvalReq,
+            Message::EvalRsp(_) => MessageCMD::EvalRsp,
+            Message::BreakNotify(_) => MessageCMD::BreakNotify,
+            Message::AttachedNotify(_) => MessageCMD::AttachedNotify,
+            Message::StartHookReq(_) => MessageCMD::StartHookReq,
+            Message::StartHookRsp(_) => MessageCMD::StartHookRsp,
+            Message::LogNotify(_) => MessageCMD::LogNotify,
+        }
+    }
 }
 
 // value type

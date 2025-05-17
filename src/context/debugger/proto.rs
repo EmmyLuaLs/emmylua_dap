@@ -33,6 +33,20 @@ pub enum MessageCMD {
     LogNotify,
 }
 
+impl MessageCMD {
+    pub fn get_rsp_cmd(&self) -> MessageCMD {
+        match self {
+            MessageCMD::InitReq => MessageCMD::InitRsp,
+            MessageCMD::ReadyReq => MessageCMD::ReadyRsp,
+            MessageCMD::AddBreakPointReq => MessageCMD::AddBreakPointRsp,
+            MessageCMD::RemoveBreakPointReq => MessageCMD::RemoveBreakPointRsp,
+            MessageCMD::ActionReq => MessageCMD::ActionRsp,
+            MessageCMD::EvalReq => MessageCMD::EvalRsp,
+            _ => MessageCMD::Unknown,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Message {
     InitReq(InitReq),
@@ -265,5 +279,4 @@ pub struct StartHookRsp {}
 #[serde(rename_all = "camelCase")]
 pub struct LogNotify {
     pub message: String,
-    pub level: String, // 可以是 "info", "warning", "error" 等
 }

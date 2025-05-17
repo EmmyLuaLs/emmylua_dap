@@ -1,11 +1,17 @@
+mod debugger_notification;
 mod initialize;
 mod launch;
+mod threads;
 
 use std::error::Error;
 
-use dap::{requests::{Command, Request}, responses::ResponseBody};
+use dap::{
+    requests::{Command, Request},
+    responses::ResponseBody,
+};
 pub use initialize::on_initialize_request;
 pub use launch::on_launch_request;
+use threads::on_threads_request;
 
 use crate::context::EmmyLuaDebugContext;
 
@@ -17,17 +23,24 @@ pub async fn on_request_dispatch(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match request.command.clone() {
         Command::Initialize(initialize_argument) => {
-            context.task(request, initialize_argument, on_initialize_request).await;
+            context
+                .task(request, initialize_argument, on_initialize_request)
+                .await;
         }
         Command::Launch(launch_argument) => {
-            context.task(request, launch_argument, on_launch_request).await;
+            context
+                .task(request, launch_argument, on_launch_request)
+                .await;
+        }
+        Command::Threads => {
+            context.task(request, (), on_threads_request).await;
         }
         Command::Cancel(cancel_argument) => {
             if let Some(req_id) = cancel_argument.request_id {
                 context.cancel(req_id).await;
             }
-            
-            return Ok(())
+
+            return Ok(());
         }
         _ => {
             let response = request.error("Unsupported request");

@@ -1,9 +1,9 @@
 mod error;
 mod proto;
 
-use error::DebuggerError;
 #[allow(unused)]
 pub use proto::*;
+pub use error::DebuggerError;
 use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
@@ -272,7 +272,7 @@ impl DebuggerConnection {
             }
 
             // 等待响应
-            let receiver = self.register_callback(request.get_cmd()).await;
+            let receiver = self.register_callback(request.get_cmd().get_rsp_cmd()).await;
             if let Some(mut rx) = receiver {
                 if let Some(response) = rx.recv().await {
                     return Ok(response);
@@ -282,4 +282,9 @@ impl DebuggerConnection {
 
         Err(DebuggerError::ConnectionError("not connected".to_string()).into())
     }
+}
+
+#[derive(Debug, Default)]
+pub struct DebuggerData {
+    pub stacks: Vec<Stack>
 }

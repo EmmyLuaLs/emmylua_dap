@@ -3,7 +3,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     context::{DapSnapShot, EmmyNewDebugArguments},
-    handler::RequestHandlerError,
+    handler::{RequestHandlerError, debugger_notification::register_debugger_notification},
 };
 
 use super::RequestResult;
@@ -27,8 +27,25 @@ pub async fn on_launch_request(
     let emmy_new_debug_argument = serde_json::from_value::<EmmyNewDebugArguments>(additional)
         .map_err(|_| RequestHandlerError::Message("Failed to parse additional data".to_string()))?;
 
-    let debugger_conn = dap.debugger_conn.lock().await;
-    // if emmy_new_debug_argument.ide_connect_debugger
+    let mut debugger_conn = dap.debugger_conn.lock().await;
+    let address = format!(
+        "{}:{}",
+        emmy_new_debug_argument.host, emmy_new_debug_argument.port
+    );
+    if emmy_new_debug_argument.ide_connect_debugger {
+        debugger_conn
+            .connect(&address, Some(5))
+            .await
+            .map_err(|e| {
+                RequestHandlerError::Message(format!("Failed to connect to debugger: {}", e))
+            })?;
+    } else {
+        debugger_conn.listen(&address).await.map_err(|e| {
+            RequestHandlerError::Message(format!("Failed to listen on debugger: {}", e))
+        })?;
+    }
+
+    register_debugger_notification(dap.clone()).await;
 
     Ok(ResponseBody::Launch)
 }

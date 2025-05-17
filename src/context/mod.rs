@@ -12,11 +12,13 @@ use tokio_util::sync::CancellationToken;
 use crate::handler::RequestResult;
 pub use snapshot::DapSnapShot;
 pub use emmy_new_debugger::*;
+pub use debugger::*;
 
 pub struct EmmyLuaDebugContext {
     debugger_conn: Arc<Mutex<debugger::DebuggerConnection>>,
     cancellations: Arc<Mutex<HashMap<i64, CancellationToken>>>,
     ide_conn: Arc<std::sync::Mutex<ServerOutput<Stdout>>>,
+    data: Arc<Mutex<DebuggerData>>,
 }
 
 impl EmmyLuaDebugContext {
@@ -25,6 +27,7 @@ impl EmmyLuaDebugContext {
             debugger_conn: Arc::new(Mutex::new(debugger::DebuggerConnection::new())),
             cancellations: Arc::new(Mutex::new(HashMap::new())),
             ide_conn,
+            data: Arc::new(Mutex::new(DebuggerData::default())),
         }
     }
 
@@ -32,6 +35,7 @@ impl EmmyLuaDebugContext {
         DapSnapShot {
             debugger_conn: self.debugger_conn.clone(),
             ide_conn: self.ide_conn.clone(),
+            data: self.data.clone(),
         }
     }
 

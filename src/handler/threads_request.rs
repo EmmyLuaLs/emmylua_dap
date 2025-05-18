@@ -5,7 +5,7 @@ use crate::context::DapSnapShot;
 
 use super::RequestResult;
 
-pub async fn on_threads_request(dap: DapSnapShot, _: (), _: CancellationToken) -> RequestResult {
+pub async fn on_threads_request(_: DapSnapShot, _: (), _: CancellationToken) -> RequestResult {
     Ok(ResponseBody::Threads(ThreadsResponse {
         threads: vec![dap::types::Thread {
             id: 1,

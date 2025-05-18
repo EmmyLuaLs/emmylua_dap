@@ -116,7 +116,6 @@ pub enum ValueType {
     GROUP,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VariableNameType {
     NString,
@@ -124,7 +123,7 @@ pub enum VariableNameType {
     NComplex,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Variable {
     pub name: String,
@@ -138,7 +137,7 @@ pub struct Variable {
 }
 
 // 调用栈结构
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Stack {
     pub file: String,
@@ -254,27 +253,21 @@ pub struct EvalRsp {
     pub value: Variable,
 }
 
-// Ready请求
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReadyReq {}
 
-// Ready响应
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReadyRsp {}
 
-// 附加通知
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AttachedNotify {}
 
-// 开始Hook请求
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StartHookReq {}
 
-// 开始Hook响应
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StartHookRsp {}
 
-// 日志通知
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogNotify {

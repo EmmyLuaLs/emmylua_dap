@@ -1,11 +1,17 @@
+mod cache;
 mod error;
 mod proto;
 
+use cache::DebuggerCache;
+use dap::events::{Event, OutputEventBody};
+use dap::server::ServerOutput;
+pub use error::DebuggerError;
 #[allow(unused)]
 pub use proto::*;
-pub use error::DebuggerError;
+pub use cache::*;
 use std::collections::HashMap;
 use std::error::Error;
+use std::io::Stdout;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -57,7 +63,6 @@ impl DebuggerConnection {
         };
 
         self.stream = Some(Arc::new(Mutex::new(stream)));
-        self.start_reader_task();
         Ok(())
     }
 
@@ -73,7 +78,6 @@ impl DebuggerConnection {
             .map_err(|e| DebuggerError::from(e))?;
 
         self.stream = Some(Arc::new(Mutex::new(stream)));
-        self.start_reader_task();
         Ok(())
     }
 
@@ -88,7 +92,7 @@ impl DebuggerConnection {
         self.stream = None;
     }
 
-    fn start_reader_task(&mut self) {
+    pub fn start_reader_task(&mut self, ide_conn: Arc<std::sync::Mutex<ServerOutput<Stdout>>>) {
         if self.reader_task.is_some() {
             return;
         }
@@ -110,6 +114,14 @@ impl DebuggerConnection {
                     match read_result {
                         Ok(0) => {
                             log::error!("Connection closed by peer");
+                            let mut ide_conn = ide_conn.lock().unwrap();
+                            ide_conn.send_event(Event::Output(OutputEventBody {
+                                category: Some(dap::types::OutputEventCategory::Console),
+                                output: "Disconnected\n".to_string(),
+                                ..Default::default()
+                            }));
+
+                            ide_conn.send_event(Event::Terminated(None));
                             break;
                         }
                         Ok(n) => {
@@ -197,7 +209,7 @@ impl DebuggerConnection {
         Some(rx)
     }
 
-    pub async fn send_notification(&self, message: &Message) -> DebuggerResult<()> {
+    pub async fn send_notification(&self, message: Message) -> DebuggerResult<()> {
         if let Some(stream) = &self.stream {
             let mut stream_guard = stream.lock().await;
 
@@ -237,7 +249,7 @@ impl DebuggerConnection {
         }
     }
 
-    pub async fn send_request(&self, request: &Message) -> DebuggerResult<Message> {
+    pub async fn send_request(&self, request: Message) -> DebuggerResult<Message> {
         if let Some(stream) = &self.stream {
             let mut stream_guard = stream.lock().await;
 
@@ -272,7 +284,9 @@ impl DebuggerConnection {
             }
 
             // 等待响应
-            let receiver = self.register_callback(request.get_cmd().get_rsp_cmd()).await;
+            let receiver = self
+                .register_callback(request.get_cmd().get_rsp_cmd())
+                .await;
             if let Some(mut rx) = receiver {
                 if let Some(response) = rx.recv().await {
                     return Ok(response);
@@ -286,5 +300,9 @@ impl DebuggerConnection {
 
 #[derive(Debug, Default)]
 pub struct DebuggerData {
-    pub stacks: Vec<Stack>
+    pub stacks: Vec<Stack>,
+    pub file_cache: HashMap<String, Option<String>>,
+    pub extension: Vec<String>,
+    pub current_frame_id: i64,
+    pub cache: DebuggerCache
 }

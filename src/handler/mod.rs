@@ -1,17 +1,25 @@
+mod debugger_connected;
 mod debugger_notification;
-mod initialize;
-mod launch;
-mod threads;
+mod initialize_request;
+mod launch_request;
+mod scopes_request;
+mod stack_trace_request;
+mod threads_request;
+mod variables_request;
 
 use std::error::Error;
 
 use dap::{
+    errors::ServerError,
     requests::{Command, Request},
     responses::ResponseBody,
 };
-pub use initialize::on_initialize_request;
-pub use launch::on_launch_request;
-use threads::on_threads_request;
+pub use initialize_request::on_initialize_request;
+pub use launch_request::on_launch_request;
+use scopes_request::on_scopes_request;
+use stack_trace_request::on_stack_trace_request;
+use threads_request::on_threads_request;
+use variables_request::on_variable_request;
 
 use crate::context::EmmyLuaDebugContext;
 
@@ -35,6 +43,21 @@ pub async fn on_request_dispatch(
         Command::Threads => {
             context.task(request, (), on_threads_request).await;
         }
+        Command::StackTrace(stack_trace_argument) => {
+            context
+                .task(request, stack_trace_argument, on_stack_trace_request)
+                .await;
+        }
+        Command::Scopes(scopes_argument) => {
+            context
+                .task(request, scopes_argument, on_scopes_request)
+                .await;
+        }
+        Command::Variables(variables_argument) => {
+            context
+                .task(request, variables_argument, on_variable_request)
+                .await;
+        }
         Command::Cancel(cancel_argument) => {
             if let Some(req_id) = cancel_argument.request_id {
                 context.cancel(req_id).await;
@@ -54,12 +77,14 @@ pub async fn on_request_dispatch(
 #[derive(Debug)]
 pub enum RequestHandlerError {
     Message(String),
+    ServerError(ServerError),
 }
 
 impl std::fmt::Display for RequestHandlerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RequestHandlerError::Message(msg) => write!(f, "{}", msg),
+            RequestHandlerError::ServerError(err) => write!(f, "{}", err),
         }
     }
 }

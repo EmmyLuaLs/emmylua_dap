@@ -3,7 +3,10 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     context::{DapSnapShot, EmmyNewDebugArguments},
-    handler::{RequestHandlerError, debugger_notification::register_debugger_notification},
+    handler::{
+        RequestHandlerError, debugger_connected::on_debugger_connected,
+        debugger_notification::register_debugger_notification,
+    },
 };
 
 use super::RequestResult;
@@ -44,8 +47,13 @@ pub async fn on_launch_request(
             RequestHandlerError::Message(format!("Failed to listen on debugger: {}", e))
         })?;
     }
+    debugger_conn.start_reader_task(dap.ide_conn.clone());
+
+    let mut data = dap.data.lock().await;
+    data.extension = emmy_new_debug_argument.ext.clone();
 
     register_debugger_notification(dap.clone()).await;
+    on_debugger_connected(dap.clone(), emmy_new_debug_argument.ext).await?;
 
     Ok(ResponseBody::Launch)
 }

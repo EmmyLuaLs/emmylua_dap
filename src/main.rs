@@ -1,16 +1,13 @@
+mod cmd_args;
 mod context;
 mod handler;
 mod logger;
-mod cmd_args;
 
 use std::io::{BufReader, BufWriter, Stdin, Stdout};
 
 use context::EmmyLuaDebugContext;
-use dap::{
-    requests::{Command, Request},
-    server::Server,
-};
-use handler::{on_initialize_request, on_launch_request, on_request_dispatch};
+use dap::server::Server;
+use handler::on_request_dispatch;
 use logger::init_stderr_logger;
 
 #[tokio::main]

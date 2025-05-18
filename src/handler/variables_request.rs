@@ -17,7 +17,7 @@ pub async fn on_variable_request(
     let cache_item = data.cache.get_cache(variable_argument.variables_reference);
     let cache = &mut data.cache;
     let variables = match cache_item {
-        Some(item) => item.compute_children(cache).await,
+        Some(item) => item.compute_children(cache, dap.debugger_conn).await,
         None => {
             vec![]
         }

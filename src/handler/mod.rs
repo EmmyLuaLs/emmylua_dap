@@ -1,5 +1,7 @@
+mod debug_action_request;
 mod debugger_connected;
 mod debugger_notification;
+mod evaluate_request;
 mod initialize_request;
 mod launch_request;
 mod scopes_request;
@@ -14,6 +16,7 @@ use dap::{
     requests::{Command, Request},
     responses::ResponseBody,
 };
+use evaluate_request::on_evaluate_request;
 pub use initialize_request::on_initialize_request;
 pub use launch_request::on_launch_request;
 use scopes_request::on_scopes_request;
@@ -58,6 +61,38 @@ pub async fn on_request_dispatch(
                 .task(request, variables_argument, on_variable_request)
                 .await;
         }
+        Command::Evaluate(evaluate_argument) => {
+            context
+                .task(request, evaluate_argument, on_evaluate_request)
+                .await;
+        }
+        Command::Pause(_) => {
+            context
+                .task(request, (), debug_action_request::on_pause_request)
+                .await;
+        }
+        Command::Continue(_) => {
+            context
+                .task(request, (), debug_action_request::on_continue_request)
+                .await;
+        }
+        Command::StepIn(_) => {
+            context
+                .task(request, (), debug_action_request::on_step_in_request)
+                .await;
+        }
+
+        Command::StepOut(_) => {
+            context
+                .task(request, (), debug_action_request::on_step_out_request)
+                .await;
+        }
+        Command::Next(_) => {
+            context
+                .task(request, (), debug_action_request::on_next_request)
+                .await;
+        }
+
         Command::Cancel(cancel_argument) => {
             if let Some(req_id) = cancel_argument.request_id {
                 context.cancel(req_id).await;

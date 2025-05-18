@@ -2,10 +2,8 @@ use chrono::Local;
 use fern::Dispatch;
 use log::LevelFilter;
 
-
 const CRATE_NAME: &str = env!("CARGO_PKG_NAME");
 const CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
-
 
 pub fn init_stderr_logger(level: LevelFilter) {
     let logger = Dispatch::new()

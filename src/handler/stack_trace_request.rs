@@ -1,8 +1,4 @@
-use dap::{
-    requests::StackTraceArguments,
-    responses::ResponseBody,
-    types::Source,
-};
+use dap::{requests::StackTraceArguments, responses::ResponseBody, types::Source};
 use tokio_util::sync::CancellationToken;
 
 use crate::context::{DapSnapShot, DebuggerData, Stack};
@@ -67,7 +63,6 @@ impl StackInfo {
     }
 }
 
-
 async fn find_file_path(
     data: &mut DebuggerData,
     chunkname: String,
@@ -101,7 +96,8 @@ async fn find_file_path(
     for file_path in &file_paths {
         if let Ok(metadata) = tokio::fs::metadata(file_path).await {
             if metadata.is_file() {
-                data.file_cache.insert(chunkname.clone(), Some(file_path.clone()));
+                data.file_cache
+                    .insert(chunkname.clone(), Some(file_path.clone()));
                 return Ok(Some(file_path.clone()));
             }
         }

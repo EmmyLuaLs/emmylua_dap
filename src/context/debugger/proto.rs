@@ -103,24 +103,70 @@ impl Message {
 // value type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
+#[serde(into = "u8", from = "u8")]
 pub enum ValueType {
-    TNIL,
-    TBOOLEAN,
-    TLIGHTUSERDATA,
-    TNUMBER,
-    TSTRING,
-    TTABLE,
-    TFUNCTION,
-    TUSERDATA,
-    TTHREAD,
-    GROUP,
+    TNIL = 0,
+    TBOOLEAN = 1,
+    TLIGHTUSERDATA = 2,
+    TNUMBER = 3,
+    TSTRING = 4,
+    TTABLE = 5,
+    TFUNCTION = 6,
+    TUSERDATA = 7,
+    TTHREAD = 8,
+    GROUP = 9,
+}
+
+// Add conversions for serialization
+impl From<ValueType> for u8 {
+    fn from(value_type: ValueType) -> Self {
+        value_type as u8
+    }
+}
+
+impl From<u8> for ValueType {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => ValueType::TNIL,
+            1 => ValueType::TBOOLEAN,
+            2 => ValueType::TLIGHTUSERDATA,
+            3 => ValueType::TNUMBER,
+            4 => ValueType::TSTRING,
+            5 => ValueType::TTABLE,
+            6 => ValueType::TFUNCTION,
+            7 => ValueType::TUSERDATA,
+            8 => ValueType::TTHREAD,
+            9 => ValueType::GROUP,
+            _ => ValueType::TNIL, // Default to TNIL for unknown values
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
+#[serde(into = "u8", from = "u8")]
 pub enum VariableNameType {
-    NString,
-    NNumber,
-    NComplex,
+    NString = 0,
+    NNumber = 1,
+    NComplex = 2,
+}
+
+// Add conversions for serialization
+impl From<VariableNameType> for u8 {
+    fn from(name_type: VariableNameType) -> Self {
+        name_type as u8
+    }
+}
+
+impl From<u8> for VariableNameType {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => VariableNameType::NString,
+            1 => VariableNameType::NNumber,
+            2 => VariableNameType::NComplex,
+            _ => VariableNameType::NString, // Default to NString for unknown values
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -203,13 +249,36 @@ pub struct RemoveBreakPointRsp {}
 
 // 调试动作枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
+#[serde(into = "u8", from = "u8")]
 pub enum DebugAction {
-    Break,
-    Continue,
-    StepOver,
-    StepIn,
-    StepOut,
-    Stop,
+    Break = 0,
+    Continue = 1,
+    StepOver = 2,
+    StepIn = 3,
+    StepOut = 4,
+    Stop = 5,
+}
+
+// Add conversions for serialization
+impl From<DebugAction> for u8 {
+    fn from(action: DebugAction) -> Self {
+        action as u8
+    }
+}
+
+impl From<u8> for DebugAction {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => DebugAction::Break,
+            1 => DebugAction::Continue,
+            2 => DebugAction::StepOver,
+            3 => DebugAction::StepIn,
+            4 => DebugAction::StepOut,
+            5 => DebugAction::Stop,
+            _ => DebugAction::Stop, // Default to Stop for unknown values
+        }
+    }
 }
 
 // 调试动作请求

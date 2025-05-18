@@ -15,7 +15,8 @@ pub async fn on_scopes_request(
     let mut scopes = vec![];
     if let Some(stack) = data.stacks.get(scopes_arguments.frame_id as usize).cloned() {
         let ref_id = data.cache.allocate_cache_id();
-        let stack_item = DebuggerCacheItem::Stack(DebuggerCacheRef::new(ref_id, stack.clone()).into());
+        let stack_item =
+            DebuggerCacheItem::Stack(DebuggerCacheRef::new(ref_id, stack.clone()).into());
         data.cache.add_cache(stack_item);
         let local_scope = dap::types::Scope {
             name: "Variables".to_string(),
@@ -25,7 +26,7 @@ pub async fn on_scopes_request(
             ..Default::default()
         };
         scopes.push(local_scope);
-        
+
         let ref_id = data.cache.allocate_cache_id();
         let env_item = DebuggerCacheItem::Env(DebuggerCacheRef::new(ref_id, stack).into());
         data.cache.add_cache(env_item);

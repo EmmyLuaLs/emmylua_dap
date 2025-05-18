@@ -1,8 +1,4 @@
-use dap::{
-    requests::InitializeArguments,
-    responses::ResponseBody,
-    types::Capabilities,
-};
+use dap::{requests::InitializeArguments, responses::ResponseBody, types::Capabilities};
 use tokio_util::sync::CancellationToken;
 
 use crate::context::DapSnapShot;

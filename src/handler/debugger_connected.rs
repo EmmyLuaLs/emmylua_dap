@@ -27,7 +27,7 @@ pub async fn on_debugger_connected(
     {
         let debugger_conn = dap.debugger_conn.lock().await;
         debugger_conn
-            .send_notification(Message::InitReq(InitReq {
+            .send_message(Message::InitReq(InitReq {
                 // todo
                 emmy_helper: "".to_string(),
                 ext,
@@ -37,7 +37,7 @@ pub async fn on_debugger_connected(
         // todo add breakpoints
 
         debugger_conn
-            .send_notification(Message::ReadyReq(ReadyReq {}))
+            .send_message(Message::ReadyReq(ReadyReq {}))
             .await?;
     }
 

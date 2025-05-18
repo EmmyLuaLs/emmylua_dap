@@ -3,12 +3,12 @@ mod error;
 mod proto;
 
 use cache::DebuggerCache;
+pub use cache::*;
 use dap::events::{Event, OutputEventBody};
 use dap::server::ServerOutput;
 pub use error::DebuggerError;
 #[allow(unused)]
 pub use proto::*;
-pub use cache::*;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::Stdout;
@@ -29,6 +29,8 @@ pub struct DebuggerConnection {
     stream: Option<Arc<Mutex<TcpStream>>>,
     reader_task: Option<JoinHandle<()>>,
     response_senders: Arc<Mutex<HashMap<MessageCMD, mpsc::Sender<Message>>>>,
+    eval_seq_id: i64,
+    eval_response: Arc<Mutex<HashMap<i64, mpsc::Sender<EvalRsp>>>>,
 }
 
 #[allow(unused)]
@@ -38,6 +40,8 @@ impl DebuggerConnection {
             stream: None,
             reader_task: None,
             response_senders: Arc::new(Mutex::new(HashMap::new())),
+            eval_seq_id: 0,
+            eval_response: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -100,6 +104,7 @@ impl DebuggerConnection {
         if let Some(stream) = &self.stream {
             let stream_clone = stream.clone();
             let senders = self.response_senders.clone();
+            let eval_response = self.eval_response.clone();
 
             let handle = tokio::spawn(async move {
                 let mut buffer = vec![0u8; 4096];
@@ -149,7 +154,12 @@ impl DebuggerConnection {
                                             if let Ok(message) =
                                                 serde_json::from_str::<Message>(msg_str)
                                             {
-                                                Self::dispatch_message(message, &senders).await;
+                                                Self::dispatch_message(
+                                                    message,
+                                                    &senders,
+                                                    &eval_response,
+                                                )
+                                                .await;
                                             } else {
                                                 log::error!("parse fail: {}", msg_str);
                                             }
@@ -187,12 +197,26 @@ impl DebuggerConnection {
     async fn dispatch_message(
         message: Message,
         senders: &Arc<Mutex<HashMap<MessageCMD, mpsc::Sender<Message>>>>,
+        eval_response: &Arc<Mutex<HashMap<i64, mpsc::Sender<EvalRsp>>>>,
     ) {
         let cmd = message.get_cmd();
 
-        let senders_guard = senders.lock().await;
-        if let Some(sender) = senders_guard.get(&cmd) {
-            let _ = sender.send(message).await;
+        match cmd {
+            MessageCMD::EvalRsp => {
+                if let Message::EvalRsp(eval_rsp) = message {
+                    let seq = eval_rsp.seq as i64;
+                    let mut senders_guard = eval_response.lock().await;
+                    if let Some(sender) = senders_guard.remove(&seq) {
+                        let _ = sender.send(eval_rsp).await;
+                    }
+                }
+            }
+            _ => {
+                let senders_guard = senders.lock().await;
+                if let Some(sender) = senders_guard.get(&cmd) {
+                    let _ = sender.send(message).await;
+                }
+            }
         }
     }
 
@@ -209,7 +233,20 @@ impl DebuggerConnection {
         Some(rx)
     }
 
-    pub async fn send_notification(&self, message: Message) -> DebuggerResult<()> {
+    async fn register_eval_callback(&self, seq: i64) -> Option<mpsc::Receiver<EvalRsp>> {
+        if !self.is_connected() {
+            return None;
+        }
+
+        let (tx, rx) = mpsc::channel(1); // 创建容量为32的通道
+
+        let mut senders_guard = self.eval_response.lock().await;
+        senders_guard.insert(seq, tx);
+
+        Some(rx)
+    }
+
+    pub async fn send_message(&self, message: Message) -> DebuggerResult<()> {
         if let Some(stream) = &self.stream {
             let mut stream_guard = stream.lock().await;
 
@@ -296,6 +333,70 @@ impl DebuggerConnection {
 
         Err(DebuggerError::ConnectionError("not connected".to_string()).into())
     }
+
+    pub async fn eval_expr(
+        &mut self,
+        expression: String,
+        cache_id: i64,
+        depth: i64,
+        frame_id: i64,
+    ) -> DebuggerResult<EvalRsp> {
+        if let Some(stream) = &self.stream {
+            let seq = self.eval_seq_id;
+            self.eval_seq_id += 1;
+            let eval_req = EvalReq {
+                seq: seq as i32,
+                expr: expression,
+                stack_level: frame_id as i32,
+                depth: depth as i32,
+                cache_id: cache_id as i32,
+                value: None,
+                set_value: None,
+            };
+
+            let mut stream_guard = stream.lock().await;
+
+            let json = serde_json::to_string(&eval_req)
+                .map_err(|e| DebuggerError::SerializationError(format!("serde fail: {}", e)))?;
+
+            let msg_id = MessageCMD::EvalReq as i32;
+            let message_text = format!("{}\n{}\n", msg_id, json);
+
+            let receiver = self.register_eval_callback(seq).await;
+
+            match stream_guard
+                .write_all(message_text.as_bytes())
+                .await
+                .map_err(|e| DebuggerError::IoError(e).into())
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("send message fail: {}", e);
+                    return Err(e);
+                }
+            }
+
+            match stream_guard
+                .flush()
+                .await
+                .map_err(|e| DebuggerError::IoError(e).into())
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("flush stream fail: {}", e);
+                    return Err(e);
+                }
+            }
+
+            if let Some(mut rx) = receiver {
+                if let Some(response) = rx.recv().await {
+                    return Ok(response);
+                }
+            }
+        }
+
+        Err(DebuggerError::ConnectionError("not connected".to_string()).into())
+    }
 }
 
 #[derive(Debug, Default)]
@@ -304,5 +405,5 @@ pub struct DebuggerData {
     pub file_cache: HashMap<String, Option<String>>,
     pub extension: Vec<String>,
     pub current_frame_id: i64,
-    pub cache: DebuggerCache
+    pub cache: DebuggerCache,
 }

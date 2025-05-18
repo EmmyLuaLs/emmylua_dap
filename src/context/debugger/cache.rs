@@ -1,6 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
-use super::{Stack, ValueType, Variable};
+use tokio::sync::Mutex;
+
+use super::{DebuggerConnection, Stack, ValueType, Variable};
 
 #[derive(Debug)]
 pub struct DebuggerCache {
@@ -26,6 +28,10 @@ impl Default for DebuggerCache {
 impl DebuggerCache {
     pub fn get_cache(&self, id: i64) -> Option<DebuggerCacheItem> {
         self.caches.get(&id).cloned()
+    }
+
+    pub fn get_cache_ref(&self, id: i64) -> Option<&DebuggerCacheItem> {
+        self.caches.get(&id)
     }
 
     pub fn add_cache(&mut self, item: DebuggerCacheItem) -> i64 {
@@ -57,6 +63,34 @@ impl<T> DebuggerCacheRef<T> {
 pub struct DebuggerVariable {
     pub var: Variable,
     pub parent_ref_id: i64,
+}
+
+impl DebuggerVariable {
+    pub fn get_expr(&self, cache: &DebuggerCache) -> String {
+        let mut arr: Vec<String> = vec![];
+        let mut n: Option<&DebuggerVariable> = Some(self);
+        while let Some(var) = n {
+            if var.var.value_type != ValueType::GROUP {
+                arr.push(var.var.name.clone());
+            }
+
+            if var.parent_ref_id != 0 {
+                let parent = cache.get_cache_ref(var.parent_ref_id);
+                match parent {
+                    Some(DebuggerCacheItem::Variable(var_ref)) => {
+                        n = Some(&var_ref.item);
+                    }
+                    _ => {
+                        n = None;
+                    }
+                }
+            } else {
+                n = None;
+            }
+        }
+        arr.reverse();
+        arr.join(".")
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -115,7 +149,11 @@ impl DebuggerCacheItem {
         }
     }
 
-    pub async fn compute_children(&self, cache: &mut DebuggerCache) -> Vec<dap::types::Variable> {
+    pub async fn compute_children(
+        &self,
+        cache: &mut DebuggerCache,
+        debugger_conn: Arc<Mutex<DebuggerConnection>>,
+    ) -> Vec<dap::types::Variable> {
         match self {
             DebuggerCacheItem::Stack(stack_ref) => {
                 let mut variables = vec![];
@@ -143,8 +181,31 @@ impl DebuggerCacheItem {
                 vec![]
             }
             DebuggerCacheItem::Variable(var_ref) => {
-                let children = var_ref.item.var.children.clone();
-                
+                let mut children = var_ref.item.var.children.clone();
+                if var_ref.item.var.value_type != ValueType::GROUP {
+                    let mut debugger_conn = debugger_conn.lock().await;
+                    let eval_rsp_result = debugger_conn
+                        .eval_expr(
+                            var_ref.item.get_expr(cache),
+                            var_ref.item.var.cache_id as i64,
+                            2,
+                            -1,
+                        )
+                        .await;
+
+                    match eval_rsp_result {
+                        Ok(eval_rsp) => {
+                            if eval_rsp.success {
+                                children = eval_rsp.value.children;
+                            }
+                        }
+                        Err(err) => {
+                            log::error!("Error evaluating expression: {}", err);
+                            return vec![];
+                        }
+                    }
+                }
+
                 // todo compute children
                 if let Some(children) = children {
                     let mut result_variables = vec![];

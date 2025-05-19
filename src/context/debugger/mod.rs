@@ -200,7 +200,7 @@ impl DebuggerConnection {
         eval_response: &Arc<Mutex<HashMap<i64, mpsc::Sender<EvalRsp>>>>,
     ) {
         let cmd = message.get_cmd();
-
+        log::info!("dispatch message: {:?}", cmd);
         match cmd {
             MessageCMD::EvalRsp => {
                 if let Message::EvalRsp(eval_rsp) = message {

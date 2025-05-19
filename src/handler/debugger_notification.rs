@@ -10,7 +10,9 @@ pub async fn register_debugger_notification(dap: DapSnapShot) {
     let break_hit_notification = debugger_conn
         .register_callback(MessageCMD::BreakNotify)
         .await;
+    log::info!("Registering Break Hit notification:");
     let log_notification = debugger_conn.register_callback(MessageCMD::LogNotify).await;
+    log::info!("Registering Log notification");
 
     if let Some(mut break_hit_receiver) = break_hit_notification {
         let ide_conn = dap.ide_conn.clone();

@@ -15,7 +15,7 @@ use std::io::Stdout;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{Mutex, mpsc};
@@ -24,10 +24,9 @@ use tokio::time::timeout;
 
 type DebuggerResult<T> = Result<T, Box<dyn Error + Send>>;
 
-#[allow(unused)]
 #[derive(Debug)]
 pub struct DebuggerConnection {
-    read_stream: Option<Arc<Mutex<OwnedReadHalf>>>,
+    read_stream: Option<OwnedReadHalf>,
     write_stream: Option<Arc<Mutex<OwnedWriteHalf>>>,
     reader_task: Option<JoinHandle<()>>,
     response_senders: Arc<Mutex<HashMap<MessageCMD, mpsc::Sender<Message>>>>,
@@ -69,7 +68,7 @@ impl DebuggerConnection {
                 .map_err(|e| DebuggerError::from(e))?
         };
         let (read_stream, write_stream) = stream.into_split();
-        self.read_stream = Some(Arc::new(Mutex::new(read_stream)));
+        self.read_stream = Some(read_stream);
         self.write_stream = Some(Arc::new(Mutex::new(write_stream)));
         Ok(())
     }
@@ -86,13 +85,13 @@ impl DebuggerConnection {
             .map_err(|e| DebuggerError::from(e))?;
 
         let (read_stream, write_stream) = stream.into_split();
-        self.read_stream = Some(Arc::new(Mutex::new(read_stream)));
+        self.read_stream = Some(read_stream);
         self.write_stream = Some(Arc::new(Mutex::new(write_stream)));
         Ok(())
     }
 
     pub fn is_connected(&self) -> bool {
-        self.read_stream.is_some() && self.write_stream.is_some()
+        self.write_stream.is_some()
     }
 
     pub async fn close(&mut self) {
@@ -108,22 +107,20 @@ impl DebuggerConnection {
             return;
         }
 
-        if let Some(stream) = &self.read_stream {
-            let stream_clone = stream.clone();
+        let read_stream = self.read_stream.take();
+        if let Some(stream) = read_stream {
             let senders = self.response_senders.clone();
             let eval_response = self.eval_response.clone();
 
             let handle = tokio::spawn(async move {
-                let mut buffer = vec![0u8; 4096];
-                let mut pos = 0;
-
+                let mut msg_id_string = String::new();
+                let mut msg_json_string = String::new();
+                let mut reader = BufReader::new(stream);
                 loop {
-                    let read_result = {
-                        let mut stream_guard = stream_clone.lock().await;
-                        stream_guard.read(&mut buffer[pos..]).await
-                    };
+                    msg_id_string.clear();
+                    msg_json_string.clear();
 
-                    match read_result {
+                    match reader.read_line(&mut msg_id_string).await {
                         Ok(0) => {
                             log::error!("Connection closed by peer");
                             let mut ide_conn = ide_conn.lock().unwrap();
@@ -137,67 +134,8 @@ impl DebuggerConnection {
                             break;
                         }
                         Ok(n) => {
-                            pos += n; // 解析消息格式：第一行是整数ID，第二行是JSON内容
-                            log::debug!("read {} bytes, total bytes {}", n, pos);
-                            let mut start = 0;
-                            let mut id_line = None;
-                            let mut i = 0;
-                            let mut msg_id = 0;
-
-                            while i < pos {
-                                // 查找换行符
-                                if buffer[i] == b'\n' {
-                                    if id_line.is_none() {
-                                        // 解析第一行作为消息ID
-                                        if let Ok(id_str) = std::str::from_utf8(&buffer[start..i]) {
-                                            if let Ok(parsed_msg_id) = id_str.parse::<i32>() {
-                                                // 记录ID并继续寻找JSON内容
-                                                msg_id = parsed_msg_id;
-                                                id_line = Some(start);
-                                                start = i + 1;
-                                            }
-                                        }
-                                    } else {
-                                        // 已有ID，这一行是JSON内容
-                                        if let Ok(msg_str) = std::str::from_utf8(&buffer[start..i])
-                                        {
-                                            if let Ok(message) = Message::from_str(
-                                                msg_str,
-                                                MessageCMD::from(msg_id as i64),
-                                            ) {
-                                                Self::dispatch_message(
-                                                    message,
-                                                    &senders,
-                                                    &eval_response,
-                                                )
-                                                .await;
-                                            } else {
-                                                log::error!("parse fail: {}", msg_str);
-                                            }
-                                        }
-                                        // 重置解析状态，准备解析下一条消息
-                                        id_line = None;
-                                        start = i + 1;
-                                    }
-                                }
-                                i += 1;
-                            }
-
-                            log::debug!("parsed {} bytes", start);
-
-                            // 处理完整消息后移动剩余数据到缓冲区开头
-                            if start > 0 {
-                                buffer.copy_within(start..pos, 0);
-                                pos -= start;
-                            }
-
-                            if pos > buffer.len() - 1024 {
-                                log::debug!(
-                                    "current buffer used size {} bytes, extend buffer total size to {} bytes",
-                                    pos,
-                                    buffer.len() * 2
-                                );
-                                buffer.resize(buffer.len() * 2, 0);
+                            if n == 0 {
+                                break;
                             }
                         }
                         Err(e) => {
@@ -205,6 +143,55 @@ impl DebuggerConnection {
                             break;
                         }
                     }
+
+                    log::debug!("read message id {}", msg_id_string);
+
+                    match reader.read_line(&mut msg_json_string).await {
+                        Ok(0) => {
+                            log::error!("Connection closed by peer");
+                            let mut ide_conn = ide_conn.lock().unwrap();
+                            ide_conn.send_event(Event::Output(OutputEventBody {
+                                category: Some(dap::types::OutputEventCategory::Console),
+                                output: "Disconnected\n".to_string(),
+                                ..Default::default()
+                            }));
+
+                            ide_conn.send_event(Event::Terminated(None));
+                            break;
+                        }
+                        Ok(n) => {
+                            if n == 0 {
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Error reading from stream: {}", e);
+                            break;
+                        }
+                    }
+
+                    log::debug!("read message json {}", msg_json_string);
+
+                    let msg_id = match msg_id_string.trim().parse::<i32>() {
+                        Ok(id) => id,
+                        Err(e) => {
+                            log::error!("Error parsing message ID: {}", e);
+                            continue;
+                        }
+                    };
+
+                    let message = match Message::from_str(
+                        &msg_json_string,
+                        MessageCMD::from(msg_id as i64),
+                    ) {
+                        Ok(msg) => msg,
+                        Err(e) => {
+                            log::error!("Error parsing message JSON: {}", e);
+                            continue;
+                        }
+                    };
+
+                    Self::dispatch_message(message, &senders, &eval_response).await;
                 }
             });
 

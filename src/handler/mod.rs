@@ -5,6 +5,7 @@ mod evaluate_request;
 mod initialize_request;
 mod launch_request;
 mod scopes_request;
+mod set_breakpoint_request;
 mod stack_trace_request;
 mod threads_request;
 mod variables_request;
@@ -20,6 +21,7 @@ use evaluate_request::on_evaluate_request;
 pub use initialize_request::on_initialize_request;
 pub use launch_request::on_launch_request;
 use scopes_request::on_scopes_request;
+use set_breakpoint_request::on_set_breakpoints_request;
 use stack_trace_request::on_stack_trace_request;
 use threads_request::on_threads_request;
 use variables_request::on_variable_request;
@@ -90,6 +92,11 @@ pub async fn on_request_dispatch(
         Command::Next(_) => {
             context
                 .task(request, (), debug_action_request::on_next_request)
+                .await;
+        }
+        Command::SetBreakpoints(set_breakpoint_argument) => {
+            context
+                .task(request, set_breakpoint_argument, on_set_breakpoints_request)
                 .await;
         }
 

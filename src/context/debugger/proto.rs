@@ -195,7 +195,7 @@ pub struct Stack {
 }
 
 // 断点结构
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BreakPoint {
     pub file: String,

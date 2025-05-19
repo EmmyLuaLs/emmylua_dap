@@ -4,9 +4,7 @@ use dap::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::context::{
-    DapSnapShot, DebuggerCacheItem, DebuggerCacheRef, DebuggerVariable, EvalReq, EvalRsp,
-};
+use crate::context::{DapSnapShot, DebuggerCacheItem, DebuggerCacheRef, DebuggerVariable};
 
 use super::RequestResult;
 

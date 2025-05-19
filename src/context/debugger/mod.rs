@@ -406,4 +406,6 @@ pub struct DebuggerData {
     pub extension: Vec<String>,
     pub current_frame_id: i64,
     pub cache: DebuggerCache,
+    pub breakpoints: HashMap<(String, i64), BreakPoint>,
+    pub breakpoint_id: i64,
 }

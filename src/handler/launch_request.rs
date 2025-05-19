@@ -6,6 +6,7 @@ use crate::{
     handler::{
         RequestHandlerError, debugger_connected::on_debugger_connected,
         debugger_notification::register_debugger_notification,
+        set_breakpoint_request::send_all_breakpoints,
     },
 };
 
@@ -54,6 +55,7 @@ pub async fn on_launch_request(
 
     register_debugger_notification(dap.clone()).await;
     on_debugger_connected(dap.clone(), emmy_new_debug_argument.ext).await?;
+    send_all_breakpoints(dap.clone()).await;
 
     Ok(ResponseBody::Launch)
 }

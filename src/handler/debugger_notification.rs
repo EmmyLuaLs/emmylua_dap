@@ -17,6 +17,7 @@ pub async fn register_debugger_notification(dap: DapSnapShot) {
         let data = dap.data.clone();
         tokio::spawn(async move {
             while let Some(break_hit) = break_hit_receiver.recv().await {
+                log::info!("Received Break Hit notification: {:#?}", break_hit);
                 if let Message::BreakNotify(break_hit) = break_hit {
                     {
                         let mut data = data.lock().await;
@@ -24,6 +25,7 @@ pub async fn register_debugger_notification(dap: DapSnapShot) {
                     }
 
                     let mut ide_conn = ide_conn.lock().unwrap();
+                    log::info!("Sending Break Hit notification to IDE");
                     match ide_conn.send_event(Event::Stopped(StoppedEventBody {
                         reason: StoppedEventReason::String("breakpoint".to_string()),
                         thread_id: Some(1),
@@ -49,6 +51,7 @@ pub async fn register_debugger_notification(dap: DapSnapShot) {
         let ide_conn = dap.ide_conn.clone();
         tokio::spawn(async move {
             while let Some(log) = log_receiver.recv().await {
+                log::info!("Received Log notification: {:#?}", log);
                 if let Message::LogNotify(LogNotify { message }) = log {
                     let mut ide_conn = ide_conn.lock().unwrap();
                     match ide_conn.send_event(Event::Output(OutputEventBody {

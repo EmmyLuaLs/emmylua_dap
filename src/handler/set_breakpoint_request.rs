@@ -14,7 +14,7 @@ pub async fn on_set_breakpoints_request(
     _: CancellationToken,
 ) -> RequestResult {
     log::info!(
-        "Received SetBreakpoints request: {:?}",
+        "Received SetBreakpoints request: {:#?}",
         set_breakpoints_arguments
     );
     let source = set_breakpoints_arguments.source;

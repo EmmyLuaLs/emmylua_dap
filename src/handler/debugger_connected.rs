@@ -3,17 +3,16 @@ use std::error::Error;
 use dap::events::{Event, OutputEventBody};
 
 use crate::{
-    context::{DapSnapShot, InitReq, Message, ReadyReq},
+    context::{AddBreakPointReq, DapSnapShot, InitReq, Message, ReadyReq},
     handler::RequestHandlerError,
 };
 
-pub async fn on_debugger_connected(
+pub async fn after_debugger_connected(
     dap: DapSnapShot,
     ext: Vec<String>,
 ) -> Result<(), Box<dyn Error + Send>> {
-    log::info!("Debugger connected");
-
     {
+        log::info!("on debugger connected");
         let mut ide_conn = dap.ide_conn.lock().unwrap();
         ide_conn
             .send_event(Event::Output(OutputEventBody {
@@ -25,23 +24,36 @@ pub async fn on_debugger_connected(
     }
 
     {
+        log::info!("send init req to debugger");
         let debugger_conn = dap.debugger_conn.lock().await;
-        debugger_conn
-            .send_message(Message::InitReq(InitReq {
+        log::info!("get debugger_conn lock");
+        let rsp = debugger_conn
+            .send_request(Message::InitReq(InitReq {
                 // todo
                 emmy_helper: "".to_string(),
                 ext,
             }))
             .await?;
+        log::info!("get rsp {:#?}", rsp);
 
-        // todo add breakpoints
+        log::info!("Sending all breakpoints to debugger");
+        let data = dap.data.lock().await;
+        let breakpoints = data.breakpoints.values().cloned().collect::<Vec<_>>();
+        debugger_conn
+            .send_message(Message::AddBreakPointReq(AddBreakPointReq {
+                break_points: breakpoints,
+                clear: true,
+            }))
+            .await?;
 
+        log::info!("Sending ready req to debugger");
         debugger_conn
             .send_message(Message::ReadyReq(ReadyReq {}))
             .await?;
     }
 
     {
+        log::info!("send initialized event to ide");
         let mut ide_conn = dap.ide_conn.lock().unwrap();
         ide_conn
             .send_event(Event::Initialized)

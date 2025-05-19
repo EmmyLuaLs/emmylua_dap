@@ -5,14 +5,18 @@ mod logger;
 
 use std::io::{BufReader, BufWriter, Stdin, Stdout};
 
+use cmd_args::CmdArgs;
 use context::EmmyLuaDebugContext;
 use dap::server::Server;
 use handler::on_request_dispatch;
-use logger::init_stderr_logger;
+use logger::init_logger;
+use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    init_stderr_logger(log::LevelFilter::Info);
+    let cmd_args = CmdArgs::from_args();
+
+    init_logger(&cmd_args);
     let input = BufReader::new(std::io::stdin());
     let output = BufWriter::new(std::io::stdout());
     let server = Server::new(input, output);

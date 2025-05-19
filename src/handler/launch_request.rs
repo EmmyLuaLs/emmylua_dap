@@ -4,9 +4,8 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     context::{DapSnapShot, EmmyNewDebugArguments},
     handler::{
-        RequestHandlerError, debugger_connected::on_debugger_connected,
+        RequestHandlerError, debugger_connected::after_debugger_connected,
         debugger_notification::register_debugger_notification,
-        set_breakpoint_request::send_all_breakpoints,
     },
 };
 
@@ -17,7 +16,7 @@ pub async fn on_launch_request(
     launch_arguments: LaunchRequestArguments,
     _: CancellationToken,
 ) -> RequestResult {
-    log::info!("Received Launch request: {:?}", launch_arguments);
+    log::info!("Received Launch request: {:#?}", launch_arguments);
     // todo check mode
     let additional = match launch_arguments.additional_data {
         Some(additional) => additional,
@@ -32,11 +31,15 @@ pub async fn on_launch_request(
         .map_err(|_| RequestHandlerError::Message("Failed to parse additional data".to_string()))?;
 
     let mut debugger_conn = dap.debugger_conn.lock().await;
-    let address = format!(
-        "{}:{}",
-        emmy_new_debug_argument.host, emmy_new_debug_argument.port
-    );
+
+    let mut host = emmy_new_debug_argument.host;
+    if host == "localhost" {
+        host = "[::1]".into();
+    }
+
+    let address = format!("{}:{}", host, emmy_new_debug_argument.port);
     if emmy_new_debug_argument.ide_connect_debugger {
+        log::info!("Debugger connected to {}", address);
         debugger_conn
             .connect(&address, Some(5))
             .await
@@ -44,18 +47,34 @@ pub async fn on_launch_request(
                 RequestHandlerError::Message(format!("Failed to connect to debugger: {}", e))
             })?;
     } else {
+        log::info!("Debugger listening on {}", address);
         debugger_conn.listen(&address).await.map_err(|e| {
             RequestHandlerError::Message(format!("Failed to listen on debugger: {}", e))
         })?;
     }
+
+    log::info!("Debugger connection established, starting reader task");
     debugger_conn.start_reader_task(dap.ide_conn.clone());
 
     let mut data = dap.data.lock().await;
     data.extension = emmy_new_debug_argument.ext.clone();
 
-    register_debugger_notification(dap.clone()).await;
-    on_debugger_connected(dap.clone(), emmy_new_debug_argument.ext).await?;
-    send_all_breakpoints(dap.clone()).await;
+    let dap = dap.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        log::info!("Registering debugger notification");
+        register_debugger_notification(dap.clone()).await;
+
+        log::info!("after debugger connected");
+        match after_debugger_connected(dap, emmy_new_debug_argument.ext).await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Failed to handle debugger connected: {}", err);
+                // exit
+                std::process::exit(1);
+            }
+        }
+    });
 
     Ok(ResponseBody::Launch)
 }

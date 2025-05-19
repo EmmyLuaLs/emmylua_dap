@@ -10,7 +10,7 @@ pub async fn on_initialize_request(
     initialize_arguments: InitializeArguments,
     _: CancellationToken,
 ) -> RequestResult {
-    log::info!("Received Initialize request: {:?}", initialize_arguments);
+    log::info!("Received Initialize request: {:#?}", initialize_arguments);
 
     Ok(ResponseBody::Initialize(Capabilities {
         supports_evaluate_for_hovers: Some(true),

@@ -21,7 +21,6 @@ pub async fn on_set_breakpoints_request(
     let mut response_breakpoints = vec![];
     if let Some(path) = source.path {
         let mut data = dap.data.lock().await;
-        log::info!("retain breakpoints");
         data.breakpoints.retain(|key, _| key.0 != path);
         if let Some(breakpoints) = set_breakpoints_arguments.breakpoints {
             for breakpoint in breakpoints {

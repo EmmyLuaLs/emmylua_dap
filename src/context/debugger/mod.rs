@@ -137,8 +137,8 @@ impl DebuggerConnection {
                             break;
                         }
                         Ok(n) => {
-                            log::debug!("read {} bytes, total bytes {}", n, pos);
                             pos += n; // 解析消息格式：第一行是整数ID，第二行是JSON内容
+                            log::debug!("read {} bytes, total bytes {}", n, pos);
                             let mut start = 0;
                             let mut id_line = None;
                             let mut i = 0;
@@ -223,6 +223,7 @@ impl DebuggerConnection {
             MessageCMD::EvalRsp => {
                 if let Message::EvalRsp(eval_rsp) = message {
                     let seq = eval_rsp.seq as i64;
+                    log::info!("response seq: {}", seq);
                     let mut senders_guard = eval_response.lock().await;
                     if let Some(sender) = senders_guard.remove(&seq) {
                         let _ = sender.send(eval_rsp).await;
@@ -381,7 +382,7 @@ impl DebuggerConnection {
             let eval_req = EvalReq {
                 cmd: MessageCMD::EvalReq as i64,
                 seq: seq as i32,
-                expr: expression,
+                expr: expression.clone(),
                 stack_level: frame_id as i32,
                 depth: depth as i32,
                 cache_id: cache_id as i32,
@@ -395,7 +396,7 @@ impl DebuggerConnection {
 
             let msg_id = MessageCMD::EvalReq as i32;
             let message_text = format!("{}\n{}\n", msg_id, json);
-
+            log::info!("request eval :{}, seq: {}", expression, seq);
             let receiver = self.register_eval_callback(seq).await;
 
             match stream_guard

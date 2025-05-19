@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
@@ -33,6 +33,31 @@ pub enum MessageCMD {
     LogNotify,
 }
 
+impl From<i64> for MessageCMD {
+    fn from(value: i64) -> Self {
+        match value {
+            1 => MessageCMD::InitReq,
+            2 => MessageCMD::InitRsp,
+            3 => MessageCMD::ReadyReq,
+            4 => MessageCMD::ReadyRsp,
+            5 => MessageCMD::AddBreakPointReq,
+            6 => MessageCMD::AddBreakPointRsp,
+            7 => MessageCMD::RemoveBreakPointReq,
+            8 => MessageCMD::RemoveBreakPointRsp,
+            9 => MessageCMD::ActionReq,
+            10 => MessageCMD::ActionRsp,
+            11 => MessageCMD::EvalReq,
+            12 => MessageCMD::EvalRsp,
+            13 => MessageCMD::BreakNotify,
+            14 => MessageCMD::AttachedNotify,
+            15 => MessageCMD::StartHookReq,
+            16 => MessageCMD::StartHookRsp,
+            17 => MessageCMD::LogNotify,
+            _ => MessageCMD::Unknown,
+        }
+    }
+}
+
 impl MessageCMD {
     pub fn get_rsp_cmd(&self) -> MessageCMD {
         match self {
@@ -47,7 +72,8 @@ impl MessageCMD {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
 pub enum Message {
     InitReq(InitReq),
     InitRsp(InitRsp),
@@ -96,6 +122,105 @@ impl Message {
             Message::StartHookReq(_) => MessageCMD::StartHookReq,
             Message::StartHookRsp(_) => MessageCMD::StartHookRsp,
             Message::LogNotify(_) => MessageCMD::LogNotify,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Message {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        let cmd = value
+            .get("cmd")
+            .and_then(|v| v.as_i64())
+            .ok_or_else(|| de::Error::missing_field("cmd"))?;
+
+        match MessageCMD::from(cmd) {
+            MessageCMD::InitReq => {
+                let init_req: InitReq = serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::InitReq(init_req))
+            }
+            MessageCMD::InitRsp => {
+                let init_rsp: InitRsp = serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::InitRsp(init_rsp))
+            }
+            MessageCMD::ReadyReq => {
+                let ready_req: ReadyReq =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::ReadyReq(ready_req))
+            }
+            MessageCMD::ReadyRsp => {
+                let ready_rsp: ReadyRsp =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::ReadyRsp(ready_rsp))
+            }
+            MessageCMD::AddBreakPointReq => {
+                let add_breakpoint_req: AddBreakPointReq =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::AddBreakPointReq(add_breakpoint_req))
+            }
+            MessageCMD::AddBreakPointRsp => {
+                let add_breakpoint_rsp: AddBreakPointRsp =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::AddBreakPointRsp(add_breakpoint_rsp))
+            }
+            MessageCMD::RemoveBreakPointReq => {
+                let remove_breakpoint_req: RemoveBreakPointReq =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::RemoveBreakPointReq(remove_breakpoint_req))
+            }
+            MessageCMD::RemoveBreakPointRsp => {
+                let remove_breakpoint_rsp: RemoveBreakPointRsp =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::RemoveBreakPointRsp(remove_breakpoint_rsp))
+            }
+            MessageCMD::ActionReq => {
+                let action_req: ActionReq =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::ActionReq(action_req))
+            }
+            MessageCMD::ActionRsp => {
+                let action_rsp: ActionRsp =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::ActionRsp(action_rsp))
+            }
+            MessageCMD::EvalReq => {
+                let eval_req: EvalReq = serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::EvalReq(eval_req))
+            }
+            MessageCMD::EvalRsp => {
+                let eval_rsp: EvalRsp = serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::EvalRsp(eval_rsp))
+            }
+            MessageCMD::BreakNotify => {
+                let break_notify: BreakNotify =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::BreakNotify(break_notify))
+            }
+            MessageCMD::AttachedNotify => {
+                let attached_notify: AttachedNotify =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::AttachedNotify(attached_notify))
+            }
+            MessageCMD::StartHookReq => {
+                let start_hook_req: StartHookReq =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::StartHookReq(start_hook_req))
+            }
+            MessageCMD::StartHookRsp => {
+                let start_hook_rsp: StartHookRsp =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::StartHookRsp(start_hook_rsp))
+            }
+            MessageCMD::LogNotify => {
+                let log_notify: LogNotify =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Message::LogNotify(log_notify))
+            }
+            _ => Err(de::Error::custom(format!("Unknown command: {}", cmd))),
         }
     }
 }
@@ -212,6 +337,7 @@ pub struct BreakPoint {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InitReq {
+    pub cmd: i64,
     pub emmy_helper: String,
     pub ext: Vec<String>,
 }
@@ -227,6 +353,7 @@ pub struct InitRsp {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddBreakPointReq {
+    pub cmd: i64,
     pub break_points: Vec<BreakPoint>,
     pub clear: bool,
 }
@@ -240,6 +367,7 @@ pub struct AddBreakPointRsp {}
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoveBreakPointReq {
+    pub cmd: i64,
     pub break_points: Vec<BreakPoint>,
 }
 
@@ -284,6 +412,7 @@ impl From<u8> for DebugAction {
 // 调试动作请求
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActionReq {
+    pub cmd: i64,
     pub action: DebugAction,
 }
 
@@ -301,6 +430,7 @@ pub struct BreakNotify {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EvalReq {
+    pub cmd: i64,
     pub seq: i32,
     pub expr: String,
     pub stack_level: i32,
@@ -323,7 +453,9 @@ pub struct EvalRsp {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ReadyReq {}
+pub struct ReadyReq {
+    pub cmd: i64,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReadyRsp {}
@@ -332,7 +464,9 @@ pub struct ReadyRsp {}
 pub struct AttachedNotify {}
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct StartHookReq {}
+pub struct StartHookReq {
+    pub cmd: i64,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StartHookRsp {}

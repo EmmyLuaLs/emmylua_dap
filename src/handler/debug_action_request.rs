@@ -1,7 +1,7 @@
 use dap::responses::{ContinueResponse, ResponseBody};
 use tokio_util::sync::CancellationToken;
 
-use crate::context::{ActionReq, DapSnapShot, DebugAction, Message};
+use crate::context::{ActionReq, DapSnapShot, DebugAction, Message, MessageCMD};
 
 use super::RequestResult;
 
@@ -10,6 +10,7 @@ pub async fn on_pause_request(dap: DapSnapShot, _: (), _: CancellationToken) -> 
     let debugger_conn = dap.debugger_conn.lock().await;
     debugger_conn
         .send_message(Message::ActionReq(ActionReq {
+            cmd: MessageCMD::ActionReq as i64,
             action: DebugAction::Break,
         }))
         .await?;
@@ -22,6 +23,7 @@ pub async fn on_continue_request(dap: DapSnapShot, _: (), _: CancellationToken) 
     let debugger_conn = dap.debugger_conn.lock().await;
     debugger_conn
         .send_message(Message::ActionReq(ActionReq {
+            cmd: MessageCMD::ActionReq as i64,
             action: DebugAction::Continue,
         }))
         .await?;
@@ -36,6 +38,7 @@ pub async fn on_step_in_request(dap: DapSnapShot, _: (), _: CancellationToken) -
     let debugger_conn = dap.debugger_conn.lock().await;
     debugger_conn
         .send_message(Message::ActionReq(ActionReq {
+            cmd: MessageCMD::ActionReq as i64,
             action: DebugAction::StepIn,
         }))
         .await?;
@@ -48,6 +51,7 @@ pub async fn on_step_out_request(dap: DapSnapShot, _: (), _: CancellationToken) 
     let debugger_conn = dap.debugger_conn.lock().await;
     debugger_conn
         .send_message(Message::ActionReq(ActionReq {
+            cmd: MessageCMD::ActionReq as i64,
             action: DebugAction::StepOut,
         }))
         .await?;
@@ -60,6 +64,7 @@ pub async fn on_next_request(dap: DapSnapShot, _: (), _: CancellationToken) -> R
     let debugger_conn = dap.debugger_conn.lock().await;
     debugger_conn
         .send_message(Message::ActionReq(ActionReq {
+            cmd: MessageCMD::ActionReq as i64,
             action: DebugAction::StepOver,
         }))
         .await?;

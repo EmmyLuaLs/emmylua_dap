@@ -4,7 +4,7 @@ use dap::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::context::{AddBreakPointReq, BreakPoint, DapSnapShot, Message};
+use crate::context::{AddBreakPointReq, BreakPoint, DapSnapShot, Message, MessageCMD};
 
 use super::RequestResult;
 
@@ -62,6 +62,7 @@ pub async fn send_all_breakpoints(dap: DapSnapShot) {
     let debugger_conn = dap.debugger_conn.lock().await;
     match debugger_conn
         .send_message(Message::AddBreakPointReq(AddBreakPointReq {
+            cmd: MessageCMD::AddBreakPointReq as i64,
             break_points: breakpoints,
             clear: true,
         }))

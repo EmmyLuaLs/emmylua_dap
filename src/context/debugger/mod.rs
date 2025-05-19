@@ -16,6 +16,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{Mutex, mpsc};
 use tokio::task::JoinHandle;
@@ -26,7 +27,8 @@ type DebuggerResult<T> = Result<T, Box<dyn Error + Send>>;
 #[allow(unused)]
 #[derive(Debug)]
 pub struct DebuggerConnection {
-    stream: Option<Arc<Mutex<TcpStream>>>,
+    read_stream: Option<Arc<Mutex<OwnedReadHalf>>>,
+    write_stream: Option<Arc<Mutex<OwnedWriteHalf>>>,
     reader_task: Option<JoinHandle<()>>,
     response_senders: Arc<Mutex<HashMap<MessageCMD, mpsc::Sender<Message>>>>,
     eval_seq_id: i64,
@@ -37,7 +39,8 @@ pub struct DebuggerConnection {
 impl DebuggerConnection {
     pub fn new() -> Self {
         DebuggerConnection {
-            stream: None,
+            read_stream: None,
+            write_stream: None,
             reader_task: None,
             response_senders: Arc::new(Mutex::new(HashMap::new())),
             eval_seq_id: 0,
@@ -65,8 +68,9 @@ impl DebuggerConnection {
                 .await
                 .map_err(|e| DebuggerError::from(e))?
         };
-
-        self.stream = Some(Arc::new(Mutex::new(stream)));
+        let (read_stream, write_stream) = stream.into_split();
+        self.read_stream = Some(Arc::new(Mutex::new(read_stream)));
+        self.write_stream = Some(Arc::new(Mutex::new(write_stream)));
         Ok(())
     }
 
@@ -81,19 +85,22 @@ impl DebuggerConnection {
             .await
             .map_err(|e| DebuggerError::from(e))?;
 
-        self.stream = Some(Arc::new(Mutex::new(stream)));
+        let (read_stream, write_stream) = stream.into_split();
+        self.read_stream = Some(Arc::new(Mutex::new(read_stream)));
+        self.write_stream = Some(Arc::new(Mutex::new(write_stream)));
         Ok(())
     }
 
     pub fn is_connected(&self) -> bool {
-        self.stream.is_some()
+        self.read_stream.is_some() && self.write_stream.is_some()
     }
 
     pub async fn close(&mut self) {
         if let Some(handle) = self.reader_task.take() {
             handle.abort();
         }
-        self.stream = None;
+        self.read_stream = None;
+        self.write_stream = None;
     }
 
     pub fn start_reader_task(&mut self, ide_conn: Arc<std::sync::Mutex<ServerOutput<Stdout>>>) {
@@ -101,7 +108,7 @@ impl DebuggerConnection {
             return;
         }
 
-        if let Some(stream) = &self.stream {
+        if let Some(stream) = &self.read_stream {
             let stream_clone = stream.clone();
             let senders = self.response_senders.clone();
             let eval_response = self.eval_response.clone();
@@ -130,6 +137,7 @@ impl DebuggerConnection {
                             break;
                         }
                         Ok(n) => {
+                            log::debug!("read {} bytes, total bytes {}", n, pos);
                             pos += n; // 解析消息格式：第一行是整数ID，第二行是JSON内容
                             let mut start = 0;
                             let mut id_line = None;
@@ -172,6 +180,8 @@ impl DebuggerConnection {
                                 i += 1;
                             }
 
+                            log::debug!("parsed {} bytes", start);
+
                             // 处理完整消息后移动剩余数据到缓冲区开头
                             if start > 0 {
                                 buffer.copy_within(start..pos, 0);
@@ -179,6 +189,11 @@ impl DebuggerConnection {
                             }
 
                             if pos > buffer.len() - 1024 {
+                                log::debug!(
+                                    "current buffer used size {} bytes, extend buffer total size to {} bytes",
+                                    pos,
+                                    buffer.len() * 2
+                                );
                                 buffer.resize(buffer.len() * 2, 0);
                             }
                         }
@@ -247,15 +262,21 @@ impl DebuggerConnection {
     }
 
     pub async fn send_message(&self, message: Message) -> DebuggerResult<()> {
-        if let Some(stream) = &self.stream {
+        if let Some(stream) = &self.write_stream {
             let mut stream_guard = stream.lock().await;
-
-            let json = serde_json::to_string(&message)
-                .map_err(|e| DebuggerError::SerializationError(format!("serde fail: {}", e)))?;
+            let json = match serde_json::to_string(&message) {
+                Ok(json) => json,
+                Err(e) => {
+                    log::error!("serde fail: {}", e);
+                    return Err(
+                        DebuggerError::SerializationError(format!("serde fail: {}", e)).into(),
+                    );
+                }
+            };
 
             let msg_id = message.get_cmd() as i32;
             let message_text = format!("{}\n{}\n", msg_id, json);
-
+            log::debug!("send message: {}", message_text);
             match stream_guard
                 .write_all(message_text.as_bytes())
                 .await
@@ -267,7 +288,7 @@ impl DebuggerConnection {
                     return Err(e);
                 }
             }
-
+            log::debug!("send message ok");
             match stream_guard
                 .flush()
                 .await
@@ -279,7 +300,7 @@ impl DebuggerConnection {
                     return Err(e);
                 }
             }
-
+            log::debug!("flush stream ok");
             Ok(())
         } else {
             Err(DebuggerError::ConnectionError("not connected".to_string()).into())
@@ -287,15 +308,21 @@ impl DebuggerConnection {
     }
 
     pub async fn send_request(&self, request: Message) -> DebuggerResult<Message> {
-        if let Some(stream) = &self.stream {
+        if let Some(stream) = &self.write_stream {
             let mut stream_guard = stream.lock().await;
-
-            let json = serde_json::to_string(&request)
-                .map_err(|e| DebuggerError::SerializationError(format!("serde fail: {}", e)))?;
+            let json = match serde_json::to_string(&request) {
+                Ok(json) => json,
+                Err(e) => {
+                    log::error!("serde fail: {}", e);
+                    return Err(
+                        DebuggerError::SerializationError(format!("serde fail: {}", e)).into(),
+                    );
+                }
+            };
 
             let msg_id = request.get_cmd() as i32;
             let message_text = format!("{}\n{}\n", msg_id, json);
-
+            log::debug!("send message: {}", message_text);
             match stream_guard
                 .write_all(message_text.as_bytes())
                 .await
@@ -307,6 +334,7 @@ impl DebuggerConnection {
                     return Err(e);
                 }
             }
+            log::debug!("send message ok");
 
             match stream_guard
                 .flush()
@@ -320,6 +348,9 @@ impl DebuggerConnection {
                 }
             }
 
+            log::debug!("flush stream ok");
+
+            drop(stream_guard);
             // 等待响应
             let receiver = self
                 .register_callback(request.get_cmd().get_rsp_cmd())
@@ -341,10 +372,11 @@ impl DebuggerConnection {
         depth: i64,
         frame_id: i64,
     ) -> DebuggerResult<EvalRsp> {
-        if let Some(stream) = &self.stream {
+        if let Some(stream) = &self.write_stream {
             let seq = self.eval_seq_id;
             self.eval_seq_id += 1;
             let eval_req = EvalReq {
+                cmd: MessageCMD::EvalReq as i64,
                 seq: seq as i32,
                 expr: expression,
                 stack_level: frame_id as i32,
@@ -355,7 +387,6 @@ impl DebuggerConnection {
             };
 
             let mut stream_guard = stream.lock().await;
-
             let json = serde_json::to_string(&eval_req)
                 .map_err(|e| DebuggerError::SerializationError(format!("serde fail: {}", e)))?;
 
@@ -388,6 +419,7 @@ impl DebuggerConnection {
                 }
             }
 
+            drop(stream_guard);
             if let Some(mut rx) = receiver {
                 if let Some(response) = rx.recv().await {
                     return Ok(response);

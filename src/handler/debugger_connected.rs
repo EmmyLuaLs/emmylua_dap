@@ -3,7 +3,7 @@ use std::error::Error;
 use dap::events::{Event, OutputEventBody};
 
 use crate::{
-    context::{AddBreakPointReq, DapSnapShot, InitReq, Message, ReadyReq},
+    context::{AddBreakPointReq, DapSnapShot, InitReq, Message, MessageCMD, ReadyReq},
     handler::RequestHandlerError,
 };
 
@@ -27,20 +27,20 @@ pub async fn after_debugger_connected(
         log::info!("send init req to debugger");
         let debugger_conn = dap.debugger_conn.lock().await;
         log::info!("get debugger_conn lock");
-        let rsp = debugger_conn
-            .send_request(Message::InitReq(InitReq {
-                // todo
+        debugger_conn
+            .send_message(Message::InitReq(InitReq {
+                cmd: MessageCMD::InitReq as i64,
                 emmy_helper: "".to_string(),
                 ext,
             }))
             .await?;
-        log::info!("get rsp {:#?}", rsp);
 
         log::info!("Sending all breakpoints to debugger");
         let data = dap.data.lock().await;
         let breakpoints = data.breakpoints.values().cloned().collect::<Vec<_>>();
         debugger_conn
             .send_message(Message::AddBreakPointReq(AddBreakPointReq {
+                cmd: MessageCMD::AddBreakPointReq as i64,
                 break_points: breakpoints,
                 clear: true,
             }))
@@ -48,7 +48,9 @@ pub async fn after_debugger_connected(
 
         log::info!("Sending ready req to debugger");
         debugger_conn
-            .send_message(Message::ReadyReq(ReadyReq {}))
+            .send_message(Message::ReadyReq(ReadyReq {
+                cmd: MessageCMD::ReadyReq as i64,
+            }))
             .await?;
     }
 

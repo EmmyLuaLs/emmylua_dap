@@ -7,4 +7,5 @@ pub struct EmmyNewDebugArguments {
     pub port: u16,
     pub ext: Vec<String>,
     pub ide_connect_debugger: bool,
+    pub source_paths: Vec<String>,
 }

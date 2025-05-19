@@ -196,7 +196,7 @@ impl DebuggerCacheItem {
                     match eval_rsp_result {
                         Ok(eval_rsp) => {
                             if eval_rsp.success {
-                                children = eval_rsp.value.children;
+                                children = eval_rsp.value.unwrap().children;
                             }
                         }
                         Err(err) => {

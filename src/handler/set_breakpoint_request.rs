@@ -21,6 +21,8 @@ pub async fn on_set_breakpoints_request(
     let mut response_breakpoints = vec![];
     if let Some(path) = source.path {
         let mut data = dap.data.lock().await;
+        log::info!("retain breakpoints");
+        data.breakpoints.retain(|key, _| key.0 != path);
         if let Some(breakpoints) = set_breakpoints_arguments.breakpoints {
             for breakpoint in breakpoints {
                 let line = breakpoint.line;
@@ -44,9 +46,9 @@ pub async fn on_set_breakpoints_request(
 
                 response_breakpoints.push(response_breakpoint);
             }
-
-            send_all_breakpoints(dap.clone()).await;
         }
+        drop(data);
+        send_all_breakpoints(dap.clone()).await;
     } else {
         log::error!("No path provided in source");
     }
@@ -59,6 +61,7 @@ pub async fn on_set_breakpoints_request(
 pub async fn send_all_breakpoints(dap: DapSnapShot) {
     let data = dap.data.lock().await;
     let breakpoints = data.breakpoints.values().cloned().collect::<Vec<_>>();
+    log::info!("send all breakpoint: {:#?}", breakpoints);
     let debugger_conn = dap.debugger_conn.lock().await;
     match debugger_conn
         .send_message(Message::AddBreakPointReq(AddBreakPointReq {

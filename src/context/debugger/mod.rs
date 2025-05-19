@@ -142,6 +142,7 @@ impl DebuggerConnection {
                             let mut start = 0;
                             let mut id_line = None;
                             let mut i = 0;
+                            let mut msg_id = 0;
 
                             while i < pos {
                                 // 查找换行符
@@ -149,8 +150,9 @@ impl DebuggerConnection {
                                     if id_line.is_none() {
                                         // 解析第一行作为消息ID
                                         if let Ok(id_str) = std::str::from_utf8(&buffer[start..i]) {
-                                            if let Ok(_msg_id) = id_str.parse::<i32>() {
+                                            if let Ok(parsed_msg_id) = id_str.parse::<i32>() {
                                                 // 记录ID并继续寻找JSON内容
+                                                msg_id = parsed_msg_id;
                                                 id_line = Some(start);
                                                 start = i + 1;
                                             }
@@ -159,9 +161,10 @@ impl DebuggerConnection {
                                         // 已有ID，这一行是JSON内容
                                         if let Ok(msg_str) = std::str::from_utf8(&buffer[start..i])
                                         {
-                                            if let Ok(message) =
-                                                serde_json::from_str::<Message>(msg_str)
-                                            {
+                                            if let Ok(message) = Message::from_str(
+                                                msg_str,
+                                                MessageCMD::from(msg_id as i64),
+                                            ) {
                                                 Self::dispatch_message(
                                                     message,
                                                     &senders,
@@ -436,6 +439,7 @@ pub struct DebuggerData {
     pub stacks: Vec<Stack>,
     pub file_cache: HashMap<String, Option<String>>,
     pub extension: Vec<String>,
+    pub sources: Vec<String>,
     pub current_frame_id: i64,
     pub cache: DebuggerCache,
     pub breakpoints: HashMap<(String, i64), BreakPoint>,

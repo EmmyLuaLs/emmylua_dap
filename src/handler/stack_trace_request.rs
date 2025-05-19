@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use dap::{requests::StackTraceArguments, responses::ResponseBody, types::Source};
 use tokio_util::sync::CancellationToken;
 
@@ -79,6 +81,11 @@ async fn find_file_path(
     } else {
         chunkname.clone()
     };
+    let sources = data
+        .sources
+        .iter()
+        .map(|s| Path::new(s))
+        .collect::<Vec<_>>();
 
     let mut file_paths = vec![];
     for ext in &data.extension {
@@ -94,11 +101,20 @@ async fn find_file_path(
     }
 
     for file_path in &file_paths {
-        if let Ok(metadata) = tokio::fs::metadata(file_path).await {
-            if metadata.is_file() {
+        let path = Path::new(file_path);
+        if path.exists() {
+            let real_file_path = path.to_string_lossy().to_string();
+            data.file_cache
+                .insert(chunkname.clone(), Some(real_file_path.clone()));
+            return Ok(Some(real_file_path));
+        }
+        for source in &sources {
+            let real_file_path = source.join(path);
+            if real_file_path.exists() {
+                let real_file_path_str = real_file_path.to_string_lossy().to_string();
                 data.file_cache
-                    .insert(chunkname.clone(), Some(file_path.clone()));
-                return Ok(Some(file_path.clone()));
+                    .insert(chunkname.clone(), Some(real_file_path_str.clone()));
+                return Ok(Some(real_file_path_str));
             }
         }
     }

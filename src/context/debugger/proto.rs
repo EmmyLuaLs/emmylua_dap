@@ -1,3 +1,4 @@
+#[allow(unused)]
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -124,21 +125,10 @@ impl Message {
             Message::LogNotify(_) => MessageCMD::LogNotify,
         }
     }
-}
 
-impl<'de> Deserialize<'de> for Message {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = serde_json::Value::deserialize(deserializer)?;
-
-        let cmd = value
-            .get("cmd")
-            .and_then(|v| v.as_i64())
-            .ok_or_else(|| de::Error::missing_field("cmd"))?;
-
-        match MessageCMD::from(cmd) {
+    pub fn from_str(s: &str, cmd: MessageCMD) -> Result<Self, serde_json::Error> {
+        let value: serde_json::Value = serde_json::from_str(s)?;
+        match cmd {
             MessageCMD::InitReq => {
                 let init_req: InitReq = serde_json::from_value(value).map_err(de::Error::custom)?;
                 Ok(Message::InitReq(init_req))
@@ -220,7 +210,7 @@ impl<'de> Deserialize<'de> for Message {
                     serde_json::from_value(value).map_err(de::Error::custom)?;
                 Ok(Message::LogNotify(log_notify))
             }
-            _ => Err(de::Error::custom(format!("Unknown command: {}", cmd))),
+            _ => Err(de::Error::custom("Unknown command")),
         }
     }
 }
@@ -448,8 +438,10 @@ pub struct EvalReq {
 pub struct EvalRsp {
     pub seq: i32,
     pub success: bool,
-    pub error: String,
-    pub value: Variable,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<Variable>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

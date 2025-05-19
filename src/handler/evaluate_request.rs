@@ -21,7 +21,7 @@ pub async fn on_evaluate_request(
 
     if eval_rsp.success {
         let mut data = dap.data.lock().await;
-        let value = eval_rsp.value;
+        let value = eval_rsp.value.unwrap();
         let ref_id = data.cache.allocate_cache_id();
         let variable_item = DebuggerCacheItem::Variable(
             DebuggerCacheRef::new(
@@ -44,7 +44,7 @@ pub async fn on_evaluate_request(
         }))
     } else {
         Ok(ResponseBody::Evaluate(EvaluateResponse {
-            result: eval_rsp.error,
+            result: eval_rsp.error.unwrap_or("".to_string()),
             type_field: Some("string".to_string()),
             variables_reference: 0,
             ..Default::default()

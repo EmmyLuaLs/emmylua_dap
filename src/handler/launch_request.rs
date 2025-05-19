@@ -58,6 +58,7 @@ pub async fn on_launch_request(
 
     let mut data = dap.data.lock().await;
     data.extension = emmy_new_debug_argument.ext.clone();
+    data.sources = emmy_new_debug_argument.source_paths.clone();
 
     let dap = dap.clone();
     tokio::spawn(async move {

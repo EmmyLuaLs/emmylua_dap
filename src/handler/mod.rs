@@ -99,7 +99,6 @@ pub async fn on_request_dispatch(
                 .task(request, set_breakpoint_argument, on_set_breakpoints_request)
                 .await;
         }
-
         Command::Cancel(cancel_argument) => {
             if let Some(req_id) = cancel_argument.request_id {
                 context.cancel(req_id).await;

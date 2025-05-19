@@ -74,10 +74,11 @@ pub fn init_logger(cmd_args: &CmdArgs) {
     let logger = Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
-                "[{} {} {}] {}",
+                "[{} {} {}:{}] {}",
                 Local::now().format("%Y-%m-%d %H:%M:%S %:z"),
                 record.level(),
                 record.target(),
+                record.line().unwrap_or(0),
                 message
             ))
         })
@@ -98,10 +99,11 @@ pub fn init_stderr_logger(level: LevelFilter) {
     let logger = Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
-                "[{} {} {}] {}",
+                "[{} {} {}:{}] {}",
                 Local::now().format("%Y-%m-%d %H:%M:%S %:z"),
                 record.level(),
                 record.target(),
+                record.line().unwrap_or(0),
                 message
             ))
         })

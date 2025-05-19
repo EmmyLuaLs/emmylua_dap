@@ -1,0 +1,137 @@
+name: Rust
+
+on:
+  push:
+    branches:
+     - main
+    tags:
+     - "*"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+     - main
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04,   target: x86_64-unknown-linux-gnu,    platform: linux-x64,    cross: general }
+          - { os: ubuntu-22.04,   target: x86_64-unknown-linux-gnu,    platform: linux-x64,    cross: zigbuild, glibc: 2.17 }
+          - { os: ubuntu-22.04,   target: aarch64-unknown-linux-gnu,   platform: linux-arm64,  cross: zigbuild, glibc: 2.17 }
+          - { os: ubuntu-22.04,   target: riscv64gc-unknown-linux-gnu, platform: linux-riscv64,cross: cross }
+          - { os: ubuntu-22.04,   target: x86_64-unknown-linux-musl,   platform: linux-musl,   cross: cross }
+          - { os: macos-latest,   target: x86_64-apple-darwin,         platform: darwin-x64,   cross: general-macos-intel }
+          - { os: macos-latest,   target: aarch64-apple-darwin,        platform: darwin-arm64, cross: general }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc,      platform: win32-x64,    cross: general }
+          - { os: windows-latest, target: i686-pc-windows-msvc,        platform: win32-ia32,   cross: general }
+          - { os: windows-latest, target: aarch64-pc-windows-msvc,     platform: win32-arm64,  cross: general }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: edit version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          echo "current ref ${{ github.ref }}"
+          cargo run -p edit_version -- ${{ github.ref }}
+      - name: Build - General
+        if: ${{ matrix.cross == 'general' }}
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo build --release --target ${{ matrix.target }}  
+      - name: Build - cross
+        if: ${{ matrix.cross == 'cross' }}
+        run: |
+          cargo install cross
+          cross build --release --target ${{ matrix.target }} 
+      - name: Build -zigbuild
+        if: ${{ matrix.cross == 'zigbuild' }}
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo install --locked cargo-zigbuild
+          pip3 install ziglang
+          cargo zigbuild --release --target ${{ matrix.target }}.${{ matrix.glibc }} 
+      - name: Build - general macos-intel
+        if: ${{ matrix.cross == 'general-macos-intel' }}
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo build --release --target ${{ matrix.target }} 
+          otool -l ./target/${{ matrix.target }}/release/emmylua_dap | grep -A4 "LC_BUILD_VERSION\|LC_VERSION_MIN_MACOSX"
+      - name: copy-binary
+        if: ${{ matrix.os != 'windows-latest'  }}
+        run: |
+          mkdir -p ${{ github.workspace }}/artifact/
+          cp ${{ github.workspace }}/target/${{ matrix.target }}/release/emmylua_dap ${{ github.workspace }}/artifact/
+      - name: copy-binary-windows
+        if: ${{ matrix.os == 'windows-latest'  }}
+        run: |
+          mkdir -p ${{ github.workspace }}/artifact/
+          cp ${{ github.workspace }}/target/${{ matrix.target }}/release/emmylua_dap.exe ${{ github.workspace }}/artifact/
+        shell: pwsh
+      - name: Upload
+        if: ${{ matrix.cross != 'zigbuild'  }}
+        uses: actions/upload-artifact@v4
+        with: 
+          name: emmylua_dap-${{ matrix.platform }}
+          path: ${{ github.workspace }}/artifact/
+      - name: Upload zigbuild
+        if: ${{ matrix.cross == 'zigbuild'  }}
+        uses: actions/upload-artifact@v4
+        with: 
+          name: emmylua_dap-${{ matrix.platform }}-glibc.${{ matrix.glibc }}
+          path: ${{ github.workspace }}/artifact/
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download
+        uses: actions/download-artifact@v4
+      - name: add execute permission and compress
+        run: |
+          chmod +x emmylua_dap-linux-x64/emmylua_dap
+          chmod +x emmylua_dap-linux-x64-glibc.2.17/emmylua_dap
+          chmod +x emmylua_dap-linux-arm64-glibc.2.17/emmylua_dap
+          chmod +x emmylua_dap-linux-musl/emmylua_dap
+          chmod +x emmylua_dap-linux-riscv64/emmylua_dap
+          chmod +x emmylua_dap-darwin-x64/emmylua_dap
+          chmod +x emmylua_dap-darwin-arm64/emmylua_dap
+
+          tar -zcvf emmylua_dap-linux-x64.tar.gz -C emmylua_dap-linux-x64 emmylua_dap
+          tar -zcvf emmylua_dap-linux-x64-glibc.2.17.tar.gz -C emmylua_dap-linux-x64-glibc.2.17 emmylua_dap
+          tar -zcvf emmylua_dap-linux-aarch64-glibc.2.17.tar.gz -C emmylua_dap-linux-arm64-glibc.2.17 emmylua_dap
+          tar -zcvf emmylua_dap-linux-musl.tar.gz -C emmylua_dap-linux-musl emmylua_dap
+          tar -zcvf emmylua_dap-linux-riscv64.tar.gz -C emmylua_dap-linux-riscv64 emmylua_dap
+          tar -zcvf emmylua_dap-darwin-x64.tar.gz -C emmylua_dap-darwin-x64 emmylua_dap
+          tar -zcvf emmylua_dap-darwin-arm64.tar.gz -C emmylua_dap-darwin-arm64 emmylua_dap
+      - name: windows compress
+        run: |
+          cd emmylua_dap-win32-x64
+          7z a emmylua_dap-win32-x64.zip emmylua_dap.exe
+          cd ../emmylua_dap-win32-ia32
+          7z a emmylua_dap-win32-ia32.zip emmylua_dap.exe
+          cd ../emmylua_dap-win32-arm64
+          7z a emmylua_dap-win32-arm64.zip emmylua_dap.exe
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with: 
+          name: emmylua_dap
+          draft: false
+          generate_release_notes: true
+          files: |
+            emmylua_dap-win32-x64/emmylua_dap-win32-x64.zip
+            emmylua_dap-win32-ia32/emmylua_dap-win32-ia32.zip
+            emmylua_dap-win32-arm64/emmylua_dap-win32-arm64.zip
+            emmylua_dap-linux-x64.tar.gz
+            emmylua_dap-linux-x64-glibc.2.17.tar.gz
+            emmylua_dap-linux-aarch64-glibc.2.17.tar.gz
+            emmylua_dap-linux-musl.tar.gz
+            emmylua_dap-linux-riscv64.tar.gz
+            emmylua_dap-darwin-x64.tar.gz
+            emmylua_dap-darwin-arm64.tar.gz
+          token: ${{ secrets.RELEASE }}

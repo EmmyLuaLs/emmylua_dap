@@ -1,41 +1,108 @@
-# EmmyLua Debug Adapter
+<div align="center">
 
-EmmyLua Debug Adapter is dap based on [EmmyLuaDebugger](https://github.com/EmmyLua/EmmyLuaDebugger)
+# 🚀 EmmyLua Debug Adapter
 
-## basic usage
+<p align="center">
+  <strong>A powerful Debug Adapter Protocol (DAP) implementation for Lua debugging</strong>
+</p>
 
-insert debug code:
+<p align="center">  <img src="https://img.shields.io/badge/language-Rust-orange?style=for-the-badge&logo=rust" alt="Rust">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue?style=for-the-badge" alt="Platform">
+  <img src="https://img.shields.io/badge/lua-5.1%20%7C%205.2%20%7C%205.3%20%7C%205.4%20%7C%20LuaJIT-purple?style=for-the-badge&logo=lua" alt="Lua">
+  <img src="https://img.shields.io/badge/LuaJIT-2.0%20%7C%202.1-red?style=for-the-badge" alt="LuaJIT">
+</p>
 
-### Windows
+<p align="center">
+  Built on top of the robust <a href="https://github.com/EmmyLua/EmmyLuaDebugger">EmmyLuaDebugger</a> foundation
+</p>
+
+---
+
+</div>
+
+## ✨ Features
+
+- 🎯 **Debug Adapter Protocol (DAP)** compatible
+- 🔧 **Cross-platform** support (Windows, Linux, macOS)
+- 🚀 **Easy integration** with any DAP-compatible editor
+- 🐛 **Advanced debugging** capabilities for Lua applications
+- 🌟 **LuaJIT support** for high-performance Lua applications
+- 📁 **Multiple file extensions** support (.lua, .lua.txt, .lua.bytes)
+- 🌐 **TCP connection** for remote debugging
+
+## 🚀 Quick Start
+
+### 📦 Installation
+
+1. Download the latest release from the [releases page](https://github.com/EmmyLua/emmylua_dap/releases)
+2. Extract the executable to your desired location
+3. Ensure the `emmy_core` library is available in your Lua environment
+
+### 🛠️ Setup Your Lua Application
+
+Add the following debug code to your Lua application:
+
+#### 🖥️ Windows
 ```lua
-package.cpath = package.cpath .. ";<path to emmy_core>/?.dll"
+-- Add the emmy_core library to your package path
+package.cpath = package.cpath .. ";<path_to_emmy_core>/?.dll"
+
+-- Initialize the debugger
 local dbg = require("emmy_core")
 dbg.tcpListen("localhost", 9966)
-dbg.waitIDE() -- donot need
-dbg.breakHere() -- donot need
+
+-- Optional: Wait for IDE connection
+-- dbg.waitIDE()
+
+-- Optional: Set a breakpoint
+-- dbg.breakHere()
 ```
 
-### Other OS
+#### 🐧 Linux
 ```lua
-package.cpath = package.cpath .. ";<path to emmy_core>/?.dll"
+-- Add the emmy_core library to your package path
+package.cpath = package.cpath .. ";<path_to_emmy_core>/?.so"
+
+-- Initialize the debugger
 local dbg = require("emmy_core")
 dbg.tcpListen("localhost", 9966)
-dbg.waitIDE() -- donot need
-dbg.breakHere() -- donot need
+
+-- Optional: Wait for IDE connection
+-- dbg.waitIDE()
+
+-- Optional: Set a breakpoint
+-- dbg.breakHere()
 ```
 
-And start your program, waitting for dap connected.
+#### 🍎 macOS
+```lua
+-- Add the emmy_core library to your package path
+package.cpath = package.cpath .. ";<path_to_emmy_core>/?.dylib"
+-- Initialize the debugger
+local dbg = require("emmy_core")
+dbg.tcpListen("localhost", 9966)
 
-### Dap config
+-- Optional: Wait for IDE connection
+-- dbg.waitIDE()
+
+-- Optional: Set a breakpoint
+-- dbg.breakHere()
+```
+
+
+### ⚙️ DAP Configuration
+
+Create a launch configuration in your editor:
+
 ```json
 {
     "type": "emmylua_new",
     "request": "launch",
-    "name": "EmmyLua New Debug",
+    "name": "🐛 EmmyLua Debug Session",
     "host": "localhost",
     "port": 9966,
     "sourcePaths": [
-        "${workspaceFolder}",
+        "${workspaceFolder}"
     ],
     "ext": [
         ".lua",
@@ -46,6 +113,59 @@ And start your program, waitting for dap connected.
 }
 ```
 
-## editor example
+## 🎮 Usage
 
-TODO: I don't know how to use it in other editor, please help me to add it.
+1. **Add debug code** to your Lua application (see setup section above)
+2. **Start your Lua program** - it will wait for the debugger to connect
+3. **Launch the debug session** from your editor using the DAP configuration
+4. **Set breakpoints** and start debugging! 🎉
+
+## 🔧 Editor Integration
+
+### VS Code
+Currently, the EmmyLua extension does not use this project as its DAP implementation.
+
+### Neovim
+1. Use `nvim-dap` plugin
+2. Configure the DAP adapter
+3. Set up launch configuration
+
+### IntelliJ IDEA
+1. Install the "LSP4IJ" plugin
+2. Configure the DAP adapter in the dap configuration
+3. Set up a run configuration for your Lua application
+
+### Other Editors
+Any editor that supports the Debug Adapter Protocol can be used:
+- **Vim** (with DAP plugins)
+- **Emacs** (with DAP mode)
+- **Eclipse** (with DAP extensions)
+
+## 📋 Configuration Options
+
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `host` | string | Debug server host | `"localhost"` |
+| `port` | number | Debug server port | `9966` |
+| `sourcePaths` | array | Source code directories | `["${workspaceFolder}"]` |
+| `ext` | array | Supported file extensions | `[".lua", ".lua.txt", ".lua.bytes"]` |
+| `ideConnectDebugger` | boolean | IDE initiates connection | `true` |
+
+## 🤝 Contributing
+
+We welcome contributions! Please feel free to:
+
+- 🐛 Report bugs
+- 💡 Suggest features  
+- 🔧 Submit pull requests
+- 📚 Improve documentation
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [EmmyLuaDebugger](https://github.com/EmmyLua/EmmyLuaDebugger) - The core debugging engine
+- Contributors who help improve this project
+

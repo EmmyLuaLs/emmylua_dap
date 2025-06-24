@@ -34,11 +34,6 @@ jobs:
           submodules: recursive
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: edit version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          echo "current ref ${{ github.ref }}"
-          cargo run -p edit_version -- ${{ github.ref }}
       - name: Build - General
         if: ${{ matrix.cross == 'general' }}
         run: |

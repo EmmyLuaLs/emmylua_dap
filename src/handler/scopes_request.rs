@@ -10,6 +10,7 @@ pub async fn on_scopes_request(
     scopes_arguments: ScopesArguments,
     _: CancellationToken,
 ) -> RequestResult {
+    log::info!("Received Scopes request: {:#?}", scopes_arguments);
     let mut data = dap.data.lock().await;
     data.current_frame_id = scopes_arguments.frame_id;
     let mut scopes = vec![];

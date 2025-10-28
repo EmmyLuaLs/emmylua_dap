@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// accpet number as integer
 pub mod port_deserializer {
-    use serde::{de, Deserializer};
+    use serde::{Deserializer, de};
     use std::fmt;
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<u16, D::Error>

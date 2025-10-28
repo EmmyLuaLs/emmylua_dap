@@ -17,6 +17,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cmd_args = CmdArgs::from_args();
 
     init_logger(&cmd_args);
+    let current_path = std::env::current_dir()?;
+    log::info!("Starting path {:?}", current_path);
+
     let input = BufReader::new(std::io::stdin());
     let output = BufWriter::new(std::io::stdout());
     let server = Server::new(input, output);

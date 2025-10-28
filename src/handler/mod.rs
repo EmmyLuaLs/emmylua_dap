@@ -15,7 +15,7 @@ use std::error::Error;
 use dap::{
     errors::ServerError,
     requests::{Command, Request},
-    responses::ResponseBody,
+    responses::{ResponseBody, SetExceptionBreakpointsResponse},
 };
 use evaluate_request::on_evaluate_request;
 pub use initialize_request::on_initialize_request;
@@ -105,6 +105,13 @@ pub async fn on_request_dispatch(
             }
 
             return Ok(());
+        }
+        // workaround for zed
+        Command::SetExceptionBreakpoints(_) => {
+            let response = request.success(ResponseBody::SetExceptionBreakpoints(
+                SetExceptionBreakpointsResponse { breakpoints: None },
+            ));
+            context.respond(response).await;
         }
         _ => {
             let response = request.error("Unsupported request");

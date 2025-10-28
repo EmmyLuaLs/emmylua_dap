@@ -103,7 +103,15 @@ async fn find_file_path(
     for file_path in &file_paths {
         let path = Path::new(file_path);
         if path.exists() {
-            let real_file_path = path.to_string_lossy().to_string();
+            let real_file_path = if path.is_absolute() {
+                path.to_string_lossy().to_string()
+            } else {
+                std::env::current_dir()
+                    .unwrap()
+                    .join(path)
+                    .to_string_lossy()
+                    .to_string()
+            };
             data.file_cache
                 .insert(chunkname.clone(), Some(real_file_path.clone()));
             return Ok(Some(real_file_path));

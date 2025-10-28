@@ -120,7 +120,8 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 [[package]]
 name = "emmy_dap_types"
 version = "0.1.0"
-source = "git+https://github.com/EmmyLuaLs/emmy_dap_types#98f92357bd5c1fcf45f4aa4819fc42712ebeee67"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a4f8222acb789c6f94ddd408a5f93d70ae6cf11719ba98173221adb5874147f"
 dependencies = [
  "serde",
  "serde_json",

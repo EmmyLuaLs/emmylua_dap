@@ -36,7 +36,7 @@
 
 1. Download the latest release from the [releases page](https://github.com/EmmyLua/emmylua_dap/releases)
 2. Extract the executable to your desired location
-3. Ensure the `emmy_core` library is available in your Lua environment
+3. Ensure the [emmy_core](https://github.com/EmmyLua/EmmyLuaDebugger/releases) library is available in your Lua environment
 
 ### 🛠️ Setup Your Lua Application
 

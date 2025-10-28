@@ -102,7 +102,7 @@ Create a launch configuration in your editor:
     "host": "localhost",
     "port": 9966,
     "sourcePaths": [
-        "${workspaceFolder}"
+        "path/to/your/workspace"
     ],
     "ext": [
         ".lua",
@@ -122,24 +122,183 @@ Create a launch configuration in your editor:
 
 ## 🔧 Editor Integration
 
-### VS Code
+<details>
+<summary><b>VS Code</b></summary>
+
 Currently, the EmmyLua extension does not use this project as its DAP implementation.
 
-### Neovim
-1. Use `nvim-dap` plugin
-2. Configure the DAP adapter
-3. Set up launch configuration
+</details>
 
-### IntelliJ IDEA
-1. Install the "LSP4IJ" plugin
-2. Configure the DAP adapter in the dap configuration
-3. Set up a run configuration for your Lua application
+<details>
+<summary><b>Neovim</b></summary>
 
-### Other Editors
-Any editor that supports the Debug Adapter Protocol can be used:
-- **Vim** (with DAP plugins)
-- **Emacs** (with DAP mode)
+1. Install the `nvim-dap` plugin
+2. Configure the DAP adapter in your Neovim config:
+
+```lua
+local dap = require('dap')
+
+dap.adapters.emmylua = {
+  type = 'executable',
+  command = '/path/to/emmylua_dap',
+  args = {}
+}
+
+dap.configurations.lua = {
+  {
+    type = 'emmylua',
+    request = 'launch',
+    name = 'EmmyLua Debug',
+    host = 'localhost',
+    port = 9966,
+    sourcePaths = { 'path/to/your/workspace' }, -- maybe exist some env variable
+    ext = { '.lua' },
+    ideConnectDebugger = true
+  }
+}
+```
+
+3. Start debugging with `:DapContinue`
+
+</details>
+
+<details>
+<summary><b>IntelliJ IDEA</b></summary>
+
+1. Install the **"EmmyLua"** or **"LSP4IJ"** plugin
+2. Go to **Run** → **Edit Configurations**
+3. Add a new `Debug Adapter Protocol` configuration
+4. set command path to `emmylua_dap` executable
+5. write working directory
+6. debug mode: launch
+7. debug parameters:
+```json
+{
+  "type": "emmylua_new",
+  "request": "launch",
+  "name": " EmmyLua Debug Session",
+  "host": "localhost",
+  "port": 9966,
+  "sourcePaths": [
+    "${workspaceFolder}"
+  ],
+  "ext": [
+    ".lua",
+    ".lua.txt",
+    ".lua.bytes"
+  ],
+  "ideConnectDebugger": true
+}
+
+```
+
+
+</details>
+
+<details>
+<summary><b>Zed Editor</b></summary>
+
+1. Open your project in Zed
+2. Create or edit `.zed/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "emmylua",
+      "request": "launch",
+      "name": "EmmyLua Debug",
+      "program": "/path/to/emmylua_dap",
+      "host": "localhost",
+      "port": 9966,
+      "sourcePaths": ["$ZED_WORKTREE_ROOT"],
+      "ext": [".lua", ".lua.txt", ".lua.bytes"],
+      "ideConnectDebugger": true
+    }
+  ]
+}
+```
+
+3. Start debugging from the Debug panel
+
+</details>
+
+<details>
+<summary><b>Vim (with vim-dap)</b></summary>
+
+1. Install a DAP plugin like `vimspector` or `vim-dap`
+2. Configure `.vimspector.json`:
+
+```json
+{
+  "configurations": {
+    "EmmyLua Debug": {
+      "adapter": "emmylua",
+      "configuration": {
+        "request": "launch",
+        "host": "localhost",
+        "port": 9966,
+        "sourcePaths": ["${workspaceFolder}"],
+        "ext": [".lua", ".lua.txt", ".lua.bytes"],
+        "ideConnectDebugger": true
+      }
+    }
+  },
+  "adapters": {
+    "emmylua": {
+      "command": ["/path/to/emmylua_dap"]
+    }
+  }
+}
+```
+
+3. Start debugging with `:VimspectorLaunch`
+
+</details>
+
+<details>
+<summary><b>Emacs (with dap-mode)</b></summary>
+
+1. Install `dap-mode` package
+2. Add to your Emacs config:
+
+```elisp
+(require 'dap-mode)
+
+(dap-register-debug-template
+  "EmmyLua Debug"
+  (list :type "emmylua"
+        :request "launch"
+        :name "EmmyLua Debug Session"
+        :host "localhost"
+        :port 9966
+        :sourcePaths (list (lsp-workspace-root))
+        :ext (list ".lua" ".lua.txt" ".lua.bytes")
+        :ideConnectDebugger t))
+```
+
+3. Start debugging with `M-x dap-debug`
+
+</details>
+
+<details>
+<summary><b>Other Editors</b></summary>
+
+Any editor that supports the Debug Adapter Protocol can be used with EmmyLua DAP:
+
 - **Eclipse** (with DAP extensions)
+- **Sublime Text** (with DAP plugins)
+- **Atom** (with DAP packages)
+- **Kate** (KDE Advanced Text Editor with DAP support)
+
+General steps:
+1. Find and install a DAP plugin/extension for your editor
+2. Configure the adapter executable path
+3. Set up the launch configuration with the parameters shown above
+4. Connect to your Lua application on port 9966
+
+</details>
 
 ## 📋 Configuration Options
 
@@ -167,5 +326,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - [EmmyLuaDebugger](https://github.com/EmmyLua/EmmyLuaDebugger) - The core debugging engine
+- [emmy_dap_types](https://github.com/EmmyLuaLs/emmy_dap_types)
 - Contributors who help improve this project
 

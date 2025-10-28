@@ -199,25 +199,23 @@ dap.configurations.lua = {
 <summary><b>Zed Editor</b></summary>
 
 1. Open your project in Zed
-2. Create or edit `.zed/launch.json`:
+2. Create or edit `.zed/debug.json`:
 
 ```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "type": "emmylua",
-      "request": "launch",
-      "name": "EmmyLua Debug",
-      "program": "/path/to/emmylua_dap",
-      "host": "localhost",
-      "port": 9966,
-      "sourcePaths": ["$ZED_WORKTREE_ROOT"],
-      "ext": [".lua", ".lua.txt", ".lua.bytes"],
-      "ideConnectDebugger": true
-    }
-  ]
-}
+[
+  {
+    "label": "EmmyLua Debug",
+    "adapter": "emmylua_new",
+    "type": "emmylua_new",
+    "request": "launch",
+    "host": "localhost",
+    "port": 9966,
+    "sourcePaths": ["$ZED_WORKTREE_ROOT"],
+    "ext": [".lua", ".lua.txt", ".lua.bytes"],
+    "ideConnectDebugger": true
+  }
+]
+
 ```
 
 3. Start debugging from the Debug panel

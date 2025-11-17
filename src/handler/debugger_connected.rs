@@ -14,13 +14,17 @@ pub async fn after_debugger_connected(
     {
         log::info!("on debugger connected");
         let mut ide_conn = dap.ide_conn.lock().unwrap();
-        ide_conn
-            .send_event(Event::Output(OutputEventBody {
-                category: Some(dap::types::OutputEventCategory::Console),
-                output: "Debugger connected\n".to_string(),
-                ..Default::default()
-            }))
-            .map_err(|err| RequestHandlerError::ServerError(err))?;
+        match ide_conn.send_event(Event::Output(OutputEventBody {
+            category: Some(dap::types::OutputEventCategory::Console),
+            output: "Debugger connected\n".to_string(),
+            ..Default::default()
+        })) {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Failed to send output event: {:?}", err);
+                // Continue anyway - this is not critical
+            }
+        }
     }
 
     {
@@ -57,9 +61,15 @@ pub async fn after_debugger_connected(
     {
         log::info!("send initialized event to ide");
         let mut ide_conn = dap.ide_conn.lock().unwrap();
-        ide_conn
-            .send_event(Event::Initialized)
-            .map_err(|err| RequestHandlerError::ServerError(err))?;
+        match ide_conn.send_event(Event::Initialized) {
+            Ok(_) => {
+                log::info!("Successfully sent initialized event");
+            }
+            Err(err) => {
+                log::error!("Failed to send initialized event: {:?}", err);
+                return Err(RequestHandlerError::ServerError(err).into());
+            }
+        }
     }
     Ok(())
 }

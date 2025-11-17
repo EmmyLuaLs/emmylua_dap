@@ -61,6 +61,7 @@ pub async fn on_launch_request(
     data.sources = emmy_new_debug_argument.source_paths.clone();
 
     let dap = dap.clone();
+    let ide_conn = dap.ide_conn.clone();
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         log::info!("Registering debugger notification");
@@ -68,11 +69,15 @@ pub async fn on_launch_request(
 
         log::info!("after debugger connected");
         match after_debugger_connected(dap, emmy_new_debug_argument.ext).await {
-            Ok(_) => {}
+            Ok(_) => {
+                log::info!("Debugger connection fully established");
+            }
             Err(err) => {
                 log::error!("Failed to handle debugger connected: {}", err);
-                // exit
-                std::process::exit(1);
+                // Send a terminated event to notify the client
+                let mut output = ide_conn.lock().unwrap();
+                let _ = output.send_event(dap::events::Event::Terminated(None));
+                // Don't exit - let the client decide what to do
             }
         }
     });

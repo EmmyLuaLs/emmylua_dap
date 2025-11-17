@@ -70,12 +70,20 @@ impl EmmyLuaDebugContext {
             if let Some(response) = response {
                 match output.lock().unwrap().respond(response) {
                     Err(server_err) => {
-                        log::error!("{:?}", server_err);
-                        // exit
-                        std::process::exit(1);
+                        log::error!(
+                            "Failed to send response for request {}: {:?}",
+                            req_id,
+                            server_err
+                        );
+                        // Don't exit - DAP clients expect responses even on errors
+                        // The error will be logged and the client should handle the situation
                     }
-                    Ok(_) => {}
+                    Ok(_) => {
+                        log::debug!("Successfully sent response for request {}", req_id);
+                    }
                 }
+            } else {
+                log::warn!("No response generated for request {}", req_id);
             }
 
             let mut cancellations = cancellations.lock().await;
@@ -94,7 +102,11 @@ impl EmmyLuaDebugContext {
         let mut output = self.ide_conn.lock().unwrap();
         let result = output.respond(response);
         if let Err(server_err) = result {
-            log::error!("{:?}", server_err)
+            log::error!("Failed to send response: {:?}", server_err);
+            // Don't panic - log the error and continue
+            // The client should handle missing responses gracefully
+        } else {
+            log::debug!("Successfully sent response");
         }
     }
 }

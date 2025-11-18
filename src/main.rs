@@ -5,16 +5,16 @@ mod logger;
 
 use std::io::{BufReader, BufWriter, Stdin, Stdout};
 
+use clap::Parser;
 use cmd_args::CmdArgs;
 use context::EmmyLuaDebugContext;
 use dap::server::Server;
 use handler::on_request_dispatch;
 use logger::init_logger;
-use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cmd_args = CmdArgs::from_args();
+    let cmd_args = CmdArgs::parse();
 
     init_logger(&cmd_args);
     let current_path = std::env::current_dir()?;

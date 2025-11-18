@@ -75,8 +75,6 @@ impl EmmyLuaDebugContext {
                             req_id,
                             server_err
                         );
-                        // Don't exit - DAP clients expect responses even on errors
-                        // The error will be logged and the client should handle the situation
                     }
                     Ok(_) => {
                         log::debug!("Successfully sent response for request {}", req_id);

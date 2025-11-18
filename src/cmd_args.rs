@@ -1,15 +1,15 @@
-use structopt::StructOpt;
+use clap::Parser;
 
 #[allow(unused)]
-#[derive(Debug, StructOpt, Clone)]
-#[structopt(name = "emmylua-dap", about = "EmmyLua Debug Adapter")]
+#[derive(Debug, Parser, Clone)]
+#[command(name = "emmylua-dap", about = "EmmyLua Debug Adapter")]
 pub struct CmdArgs {
     /// Logging level (e.g., "error", "warn", "info", "debug", "trace")
-    #[structopt(long = "log-level", help = "Logging level", default_value = "info")]
+    #[arg(long = "log-level", help = "Logging level", default_value = "info")]
     pub log_level: LogLevel,
 
     /// Path to the log file
-    #[structopt(
+    #[arg(
         long = "log-path",
         help = "Path to the log file. Use 'none' to disable log file output.",
         default_value = ""
@@ -18,8 +18,8 @@ pub struct CmdArgs {
 }
 
 /// Logging level enum
-#[derive(Debug, StructOpt, Clone, Copy)]
-#[structopt(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+#[value(rename_all = "lowercase")]
 pub enum LogLevel {
     /// Error level
     Error,

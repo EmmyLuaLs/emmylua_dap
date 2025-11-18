@@ -1,10 +1,10 @@
 [package]
 name = "emmylua_dap"
-version = "0.1.0"
+version = "0.4.0"
 edition = "2024"
 
 [dependencies]
-dap = { package= "emmy_dap_types", version = "0.1.0" }
+dap = { package= "emmy_dap_types", version = "0.2.0" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 tokio = { version = "1.48.0", features = ["full"] }
@@ -13,4 +13,4 @@ glob = "0.3"
 log = "0.4"
 fern = "0.7"
 chrono = "0.4"
-structopt = "0.3"
+clap = { version = "4.5", features = ["derive"] }

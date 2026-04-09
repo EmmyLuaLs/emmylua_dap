@@ -113,7 +113,16 @@ pub async fn on_request_dispatch(
             ));
             context.respond(response).await;
         }
+        Command::ConfigurationDone => {
+            let response = request.success(ResponseBody::ConfigurationDone);
+            context.respond(response).await;
+        }
+        Command::Disconnect(_) => {
+            let response = request.success(ResponseBody::Disconnect);
+            context.respond(response).await;
+        }
         _ => {
+            log::warn!("Unsupported request: {:?}", request.command);
             let response = request.error("Unsupported request");
             context.respond(response).await;
         }

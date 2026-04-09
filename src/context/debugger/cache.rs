@@ -142,6 +142,7 @@ impl DebuggerCacheItem {
                 dap::types::Variable {
                     name,
                     value,
+                    type_field: Some(value_kind_to_type_string(var.value_type)),
                     variables_reference: ref_id,
                     ..Default::default()
                 }
@@ -228,5 +229,20 @@ impl DebuggerCacheItem {
                 }
             }
         }
+    }
+}
+
+fn value_kind_to_type_string(value_kind: ValueType) -> String {
+    match value_kind {
+        ValueType::TSTRING => "string".to_string(),
+        ValueType::TNUMBER => "number".to_string(),
+        ValueType::TBOOLEAN => "boolean".to_string(),
+        ValueType::TTABLE => "table".to_string(),
+        ValueType::TFUNCTION => "function".to_string(),
+        ValueType::TUSERDATA => "userdata".to_string(),
+        ValueType::TTHREAD => "thread".to_string(),
+        ValueType::TNIL => "nil".to_string(),
+        ValueType::GROUP => "group".to_string(),
+        ValueType::TLIGHTUSERDATA => "userdata".to_string(),
     }
 }
